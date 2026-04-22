@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Network Security Config
+  Allows the APK to communicate with the local backend server over HTTP (non-HTTPS).
+  Without this, Android 9+ blocks all cleartext HTTP traffic by default.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

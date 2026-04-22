@@ -1,0 +1,246 @@
+import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
+import '../models/qurbani_category.dart';
+import '../models/form_settings.dart';
+
+/// Single service layer for ALL backend communication.
+/// Every screen imports this — change the base URL once, everything updates.
+class DatabaseService {
+  // ── SERVER URL CONFIGURATION ──
+  // When running on Web (Chrome): uses localhost
+  // When running on Phone (APK): uses your PC's local network IP
+  // 
+  // HOW TO FIND YOUR PC's IP:
+  //   Open CMD → type "ipconfig" → look for "IPv4 Address" under Wi-Fi
+  //   Example: 192.168.1.105
+  //
+  // IMPORTANT: Your phone and PC must be on the SAME Wi-Fi network!
+  static const String _serverIp = '192.168.1.100';  // ← CHANGE THIS to your PC's IP
+  static const int _serverPort = 8000;
+
+  static String get _baseUrl {
+    if (kIsWeb) {
+      // Web browser runs on the same machine as the server
+      return 'http://localhost:$_serverPort/api';
+    } else {
+      // Phone APK connects over Wi-Fi to the PC running the backend
+      return 'http://$_serverIp:$_serverPort/api';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REUSABLE HTTP HELPERS — Written once, used everywhere
+  // ═══════════════════════════════════════════════════════
+
+  /// Generic GET request with try/catch and JSON parsing.
+  static Future<Map<String, dynamic>> _get(String endpoint) async {
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl$endpoint'));
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e', 'data': null};
+    }
+  }
+
+  /// Generic POST request with try/catch and JSON body.
+  static Future<Map<String, dynamic>> _post(String endpoint, Map<String, dynamic> body) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl$endpoint'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e', 'data': null};
+    }
+  }
+
+  /// Generic PUT request with try/catch and JSON body.
+  static Future<Map<String, dynamic>> _put(String endpoint, Map<String, dynamic> body) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl$endpoint'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e', 'data': null};
+    }
+  }
+
+  /// Generic DELETE request with try/catch.
+  static Future<Map<String, dynamic>> _delete(String endpoint) async {
+    try {
+      final response = await http.delete(Uri.parse('$_baseUrl$endpoint'));
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e', 'data': null};
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // CATEGORIES
+  // ═══════════════════════════════════════════════════════
+
+  static Future<List<QurbaniCategory>> loadCategories() async {
+    try {
+      final result = await _get('/categories');
+      if (result['success'] == true && result['data'] != null) {
+        final List<dynamic> list = result['data'];
+        return list.map((e) => QurbaniCategory(
+          id: e['id'].toString(),
+          title: e['title'] ?? '',
+          subtitle: e['subtitle'] ?? '',
+          amount: (e['amount'] ?? 0).toDouble(),
+          hissahPerToken: e['hissah_per_token'] ?? 7,
+        )).toList();
+      }
+    } catch (e) {
+      // Fallback silently
+    }
+    // Return defaults if backend is unreachable
+    return [
+      QurbaniCategory(id: '1', title: 'Heavy Qurbani', subtitle: 'Premium size', amount: 2000.0),
+      QurbaniCategory(id: '2', title: 'Medium Qurbani', subtitle: 'Standard size', amount: 1500.0),
+    ];
+  }
+
+  static Future<void> saveCategories(List<QurbaniCategory> categories) async {
+    // Strategy: Sync by clearing and re-creating all.
+    // This is simple and reliable for small datasets.
+    try {
+      // First, get existing categories to delete them
+      final existing = await _get('/categories');
+      if (existing['success'] == true && existing['data'] != null) {
+        for (var cat in existing['data']) {
+          await _delete('/categories/${cat['id']}');
+        }
+      }
+      // Then create all current categories
+      for (var cat in categories) {
+        await _post('/categories', {
+          'title': cat.title,
+          'subtitle': cat.subtitle,
+          'amount': cat.amount,
+          'hissah_per_token': cat.hissahPerToken,
+        });
+      }
+    } catch (e) {
+      // Fail silently — data stays as-is
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // FORM SETTINGS
+  // ═══════════════════════════════════════════════════════
+
+  static Future<FormSettings> loadFormSettings() async {
+    try {
+      final result = await _get('/settings');
+      if (result['success'] == true && result['data'] != null) {
+        return FormSettings.fromJson(result['data']);
+      }
+    } catch (e) {
+      // Fallback silently
+    }
+    return FormSettings(); // Return defaults if backend is unreachable
+  }
+
+  static Future<void> saveFormSettings(FormSettings settings) async {
+    try {
+      await _put('/settings', settings.toJson());
+    } catch (e) {
+      // Fail silently
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // BOOKINGS
+  // ═══════════════════════════════════════════════════════
+
+  static Future<Map<String, dynamic>> createBooking({
+    required String categoryTitle,
+    required double amountPerHissah,
+    required String purpose,
+    required String representativeName,
+    required List<String> ownerNames,
+    required int hissahCount,
+    required double totalAmount,
+    required String address,
+    required String mobile,
+    required String reference,
+    Map<String, dynamic> customFieldsData = const {},
+  }) async {
+    try {
+      final result = await _post('/bookings', {
+        'category_title': categoryTitle,
+        'amount_per_hissah': amountPerHissah,
+        'purpose': purpose,
+        'representative_name': representativeName,
+        'owner_names': ownerNames,
+        'hissah_count': hissahCount,
+        'total_amount': totalAmount,
+        'address': address,
+        'mobile': mobile,
+        'reference': reference,
+        'custom_fields_data': customFieldsData,
+      });
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to create booking: $e'};
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> loadBookings() async {
+    try {
+      final result = await _get('/bookings');
+      if (result['success'] == true && result['data'] != null) {
+        return List<Map<String, dynamic>>.from(result['data']);
+      }
+    } catch (e) {
+      // Fallback silently
+    }
+    return [];
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TOKENS
+  // ═══════════════════════════════════════════════════════
+
+  static Future<List<Map<String, dynamic>>> loadTokens({String? category}) async {
+    try {
+      final endpoint = category != null ? '/tokens?category=$category' : '/tokens';
+      final result = await _get(endpoint);
+      if (result['success'] == true && result['data'] != null) {
+        return List<Map<String, dynamic>>.from(result['data']);
+      }
+    } catch (e) {
+      // Fallback silently
+    }
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> markQurbaniDone(int tokenId) async {
+    try {
+      final result = await _put('/tokens/$tokenId/qurbani-done', {});
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to mark qurbani done: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> markBulkQurbaniDone(List<int> tokenIds) async {
+    try {
+      final result = await _put('/tokens/bulk/qurbani-done', {
+        'token_ids': tokenIds,
+      });
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to process bulk update: $e'};
+    }
+  }
+}
