@@ -80,11 +80,9 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
                 custom_fields_data=json.dumps(payload.custom_fields_data),
             )
             db.add(booking)
-            safe_commit(db, "Failed to create booking")
-            db.refresh(booking)
+            db.flush() # Get booking.id
 
             # AUTO-ASSIGN NAMES TO TOKENS
-            # Import here to avoid circular imports — uses shared engine from tokens router
             from routers.tokens import assign_names_to_tokens
             token_assignments = assign_names_to_tokens(
                 db=db,
@@ -94,8 +92,12 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
                 purpose=payload.purpose,
             )
 
+            # ONE SINGLE COMMIT for everything (Booking + Token Entries)
+            safe_commit(db, "Failed to complete booking transaction")
+            db.refresh(booking)
+
             data = BookingResponse.model_validate(booking).model_dump()
-            data["token_assignments"] = token_assignments  # Include token info in response
+            data["token_assignments"] = token_assignments
             return success_response("Booking created", data)
         except Exception as e:
             return error_response(f"Failed to create booking: {str(e)}")

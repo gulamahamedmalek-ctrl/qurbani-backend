@@ -65,8 +65,6 @@ def assign_names_to_tokens(
             if partial_token.filled_slots >= partial_token.max_slots:
                 partial_token.status = "full"
 
-            safe_commit(db, f"Failed to assign name '{name}' to token")
-
             assignments.append({
                 "token_no": partial_token.token_no,
                 "serial_no": next_serial,
@@ -88,8 +86,7 @@ def assign_names_to_tokens(
                 status="full" if max_slots == 1 else "partial",
             )
             db.add(new_token)
-            safe_commit(db, "Failed to create new token")
-            db.refresh(new_token)
+            db.flush() # Ensure new_token.id is available for the entry
 
             entry = TokenEntry(
                 token_id=new_token.id,
@@ -99,7 +96,6 @@ def assign_names_to_tokens(
                 purpose=purpose,
             )
             db.add(entry)
-            safe_commit(db, f"Failed to assign name '{name}' to new token")
 
             assignments.append({
                 "token_no": new_token.token_no,
@@ -107,6 +103,7 @@ def assign_names_to_tokens(
                 "owner_name": name,
             })
 
+    # NO COMMITS HERE — Let the caller (create_booking) commit everything atomically.
     return assignments
 
 
