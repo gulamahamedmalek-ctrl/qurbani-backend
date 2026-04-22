@@ -24,6 +24,10 @@ class CategoryUpdate(BaseModel):
     hissah_per_token: Optional[int] = Field(None, ge=1, le=20)
 
 
+class CategorySync(BaseModel):
+    categories: List[CategoryCreate]
+
+
 class CategoryResponse(BaseModel):
     id: int
     title: str

@@ -6,10 +6,35 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Category
-from schemas import CategoryCreate, CategoryUpdate, CategoryResponse
+from schemas import CategoryCreate, CategoryUpdate, CategoryResponse, CategorySync
 from utils import success_response, error_response, get_or_404, safe_commit
 
 router = APIRouter(prefix="/api/categories", tags=["Categories"])
+
+
+@router.post("/sync")
+def sync_categories(payload: CategorySync, db: Session = Depends(get_db)):
+    """
+    Bulk synchronize categories. 
+    Deletes all existing ones and replaces them with the new list in ONE transaction.
+    """
+    try:
+        # Delete all existing
+        db.query(Category).delete()
+        
+        # Add new ones
+        for item in payload.categories:
+            db.add(Category(
+                title=item.title,
+                subtitle=item.subtitle,
+                amount=item.amount,
+                hissah_per_token=item.hissah_per_token
+            ))
+        
+        safe_commit(db, "Failed to sync categories")
+        return success_response("Categories synchronized successfully")
+    except Exception as e:
+        return error_response(f"Sync failed: {str(e)}")
 
 
 @router.get("/")

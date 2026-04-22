@@ -3,8 +3,7 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:http/http.dart' as http;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'platform_helper.dart';
 
 /// Generates a PDF receipt matching the Qurbani receipt format.
 class ReceiptGenerator {
@@ -247,18 +246,9 @@ class ReceiptGenerator {
       ),
     );
 
-    // Download PDF
+    // Download/Save PDF
     final bytes = await pdf.save();
-    final blob = html.Blob([bytes], 'application/pdf');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement()
-      ..href = url
-      ..download = 'Receipt_$receiptNo.pdf'
-      ..style.display = 'none';
-    html.document.body?.children.add(anchor);
-    anchor.click();
-    anchor.remove();
-    html.Url.revokeObjectUrl(url);
+    await PlatformHelper.instance.saveAndOpenPdf(bytes, 'Receipt_$receiptNo.pdf');
   }
 
   // ════════════════════════════════════════

@@ -9,24 +9,17 @@ import '../models/form_settings.dart';
 /// Every screen imports this — change the base URL once, everything updates.
 class DatabaseService {
   // ── SERVER URL CONFIGURATION ──
-  // When running on Web (Chrome): uses localhost
-  // When running on Phone (APK): uses your PC's local network IP
-  // 
-  // HOW TO FIND YOUR PC's IP:
-  //   Open CMD → type "ipconfig" → look for "IPv4 Address" under Wi-Fi
-  //   Example: 192.168.1.105
-  //
-  // IMPORTANT: Your phone and PC must be on the SAME Wi-Fi network!
-  static const String _serverIp = '192.168.1.100';  // ← CHANGE THIS to your PC's IP
-  static const int _serverPort = 8000;
+  // The app now connects to your LIVE backend on Render.com
+  static const String _liveBaseUrl = 'https://qurbani-api.onrender.com/api';
 
   static String get _baseUrl {
     if (kIsWeb) {
-      // Web browser runs on the same machine as the server
-      return 'http://localhost:$_serverPort/api';
+      // For local web testing, you can still use localhost if you want, 
+      // but for consistency we'll use the live URL
+      return _liveBaseUrl;
     } else {
-      // Phone APK connects over Wi-Fi to the PC running the backend
-      return 'http://$_serverIp:$_serverPort/api';
+      // For the APK/Phone, we use the live public URL
+      return _liveBaseUrl;
     }
   }
 
@@ -110,27 +103,18 @@ class DatabaseService {
   }
 
   static Future<void> saveCategories(List<QurbaniCategory> categories) async {
-    // Strategy: Sync by clearing and re-creating all.
-    // This is simple and reliable for small datasets.
+    // Optimized Strategy: Send everything in one bulk sync request.
     try {
-      // First, get existing categories to delete them
-      final existing = await _get('/categories');
-      if (existing['success'] == true && existing['data'] != null) {
-        for (var cat in existing['data']) {
-          await _delete('/categories/${cat['id']}');
-        }
-      }
-      // Then create all current categories
-      for (var cat in categories) {
-        await _post('/categories', {
-          'title': cat.title,
-          'subtitle': cat.subtitle,
-          'amount': cat.amount,
-          'hissah_per_token': cat.hissahPerToken,
-        });
-      }
+      final List<Map<String, dynamic>> body = categories.map((cat) => {
+        'title': cat.title,
+        'subtitle': cat.subtitle,
+        'amount': cat.amount,
+        'hissah_per_token': cat.hissahPerToken,
+      }).toList();
+
+      await _post('/categories/sync', {'categories': body});
     } catch (e) {
-      // Fail silently — data stays as-is
+      // Fail silently
     }
   }
 

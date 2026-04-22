@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'dart:typed_data';
+import '../services/platform_helper.dart';
 import '../models/qurbani_category.dart';
 import '../models/form_settings.dart';
 import '../services/database_service.dart';
@@ -215,7 +214,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   // ═══════════════════════════════════════════════════════════
   Widget _buildFormBuilderTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -492,7 +491,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   // ═══════════════════════════════════════════════════════════
   Widget _buildReceiptTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -740,23 +739,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   }
 
   /// Pick an image file from the user's device and convert to base64.
-  void _pickLogo() {
-    final uploadInput = html.FileUploadInputElement()..accept = 'image/*';
-    uploadInput.click();
-    uploadInput.onChange.listen((event) {
-      final file = uploadInput.files?.first;
-      if (file == null) return;
-      
-      final reader = html.FileReader();
-      reader.readAsArrayBuffer(file);
-      reader.onLoadEnd.listen((event) {
-        final bytes = reader.result as Uint8List;
-        setState(() {
-          _settings.logoBase64 = base64Encode(bytes);
-        });
-        _saveSettings();
+  Future<void> _pickLogo() async {
+    final base64Image = await PlatformHelper.instance.pickImageAsBase64();
+    if (base64Image != null) {
+      setState(() {
+        _settings.logoBase64 = base64Image;
       });
-    });
+      _saveSettings();
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -870,18 +860,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildCategoriesTab(),
-                _buildFormBuilderTab(),
-                _buildPurposesTab(),
-                _buildReceiptTab(),
-                _buildSettingsTab(),
-              ],
-            ),
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildCategoriesTab(),
+                  _buildFormBuilderTab(),
+                  _buildPurposesTab(),
+                  _buildReceiptTab(),
+                  _buildSettingsTab(),
+                ],
+              ),
+      ),
       floatingActionButton: _buildFab(),
     );
   }
