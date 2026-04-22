@@ -31,7 +31,14 @@ class DatabaseService {
   static Future<Map<String, dynamic>> _get(String endpoint) async {
     try {
       final response = await http.get(Uri.parse('$_baseUrl$endpoint'));
-      return jsonDecode(response.body);
+      if (response.body.isEmpty) {
+        return {'success': false, 'message': 'Empty response (Status: ${response.statusCode})', 'data': null};
+      }
+      try {
+        return jsonDecode(response.body);
+      } catch (e) {
+        return {'success': false, 'message': 'Invalid JSON: ${response.body.substring(0, response.body.length > 50 ? 50 : response.body.length)}', 'data': null};
+      }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e', 'data': null};
     }
@@ -45,7 +52,16 @@ class DatabaseService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
-      return jsonDecode(response.body);
+      
+      if (response.body.isEmpty) {
+        return {'success': false, 'message': 'Server returned empty response (Status: ${response.statusCode})', 'data': null};
+      }
+
+      try {
+        return jsonDecode(response.body);
+      } catch (e) {
+        return {'success': false, 'message': 'Invalid JSON response: ${response.body.substring(0, response.body.length > 50 ? 50 : response.body.length)}', 'data': null};
+      }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e', 'data': null};
     }
@@ -59,7 +75,14 @@ class DatabaseService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
-      return jsonDecode(response.body);
+      if (response.body.isEmpty) {
+        return {'success': false, 'message': 'Empty response (Status: ${response.statusCode})', 'data': null};
+      }
+      try {
+        return jsonDecode(response.body);
+      } catch (e) {
+        return {'success': false, 'message': 'Invalid JSON: ${response.body.substring(0, response.body.length > 50 ? 50 : response.body.length)}', 'data': null};
+      }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e', 'data': null};
     }
@@ -69,7 +92,14 @@ class DatabaseService {
   static Future<Map<String, dynamic>> _delete(String endpoint) async {
     try {
       final response = await http.delete(Uri.parse('$_baseUrl$endpoint'));
-      return jsonDecode(response.body);
+      if (response.body.isEmpty) {
+        return {'success': false, 'message': 'Empty response (Status: ${response.statusCode})', 'data': null};
+      }
+      try {
+        return jsonDecode(response.body);
+      } catch (e) {
+        return {'success': false, 'message': 'Invalid JSON: ${response.body.substring(0, response.body.length > 50 ? 50 : response.body.length)}', 'data': null};
+      }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e', 'data': null};
     }
