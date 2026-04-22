@@ -12,7 +12,7 @@ from utils import success_response, error_response, get_or_404, safe_commit
 router = APIRouter(prefix="/api/categories", tags=["Categories"])
 
 
-@router.post("/sync")
+@router.post("/sync/")
 def sync_categories(payload: CategorySync, db: Session = Depends(get_db)):
     """
     Bulk synchronize categories. 
@@ -67,7 +67,7 @@ def create_category(payload: CategoryCreate, db: Session = Depends(get_db)):
         return error_response(f"Failed to create category: {str(e)}")
 
 
-@router.put("/{category_id}")
+@router.put("/{category_id}/")
 def update_category(category_id: int, payload: CategoryUpdate, db: Session = Depends(get_db)):
     """Update an existing category. Only provided fields are updated."""
     try:
@@ -86,7 +86,7 @@ def update_category(category_id: int, payload: CategoryUpdate, db: Session = Dep
         return error_response(f"Failed to update category: {str(e)}")
 
 
-@router.delete("/{category_id}")
+@router.delete("/{category_id}/")
 def delete_category(category_id: int, db: Session = Depends(get_db)):
     """Delete a category by ID."""
     try:

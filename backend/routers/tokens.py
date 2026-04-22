@@ -125,7 +125,7 @@ def list_tokens(category: str = None, db: Session = Depends(get_db)):
         return error_response(f"Failed to fetch tokens: {str(e)}")
 
 
-@router.get("/summary")
+@router.get("/summary/")
 def token_summary(db: Session = Depends(get_db)):
     """Quick summary of token status per category."""
     try:
@@ -161,7 +161,7 @@ def token_summary(db: Session = Depends(get_db)):
         return error_response(f"Failed to fetch summary: {str(e)}")
 
 
-@router.get("/{token_id}")
+@router.get("/{token_id}/")
 def get_token(token_id: int, db: Session = Depends(get_db)):
     """Get a single token with all its entries."""
     try:
@@ -174,7 +174,7 @@ def get_token(token_id: int, db: Session = Depends(get_db)):
         return error_response(f"Failed to fetch token: {str(e)}")
 
 
-@router.put("/{token_id}/qurbani-done")
+@router.put("/{token_id}/qurbani-done/")
 def mark_qurbani_done(token_id: int, db: Session = Depends(get_db)):
     """Mark a token's qurbani as completed with current timestamp."""
     try:
@@ -197,7 +197,7 @@ def mark_qurbani_done(token_id: int, db: Session = Depends(get_db)):
 class BulkTokenRequest(BaseModel):
     token_ids: List[int]
 
-@router.put("/bulk/qurbani-done")
+@router.put("/bulk/qurbani-done/")
 def bulk_mark_qurbani_done(req: BulkTokenRequest, db: Session = Depends(get_db)):
     """Mark multiple tokens' qurbani as completed with current timestamp."""
     try:

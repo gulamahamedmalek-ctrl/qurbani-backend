@@ -103,7 +103,7 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
             return error_response(f"Failed to create booking: {str(e)}")
 
 
-@router.get("/{booking_id}")
+@router.get("/{booking_id}/")
 def get_booking(booking_id: int, db: Session = Depends(get_db)):
     """Fetch a single booking by ID."""
     try:
@@ -114,7 +114,7 @@ def get_booking(booking_id: int, db: Session = Depends(get_db)):
         return error_response(f"Failed to fetch booking: {str(e)}")
 
 
-@router.delete("/{booking_id}")
+@router.delete("/{booking_id}/")
 def delete_booking(booking_id: int, db: Session = Depends(get_db)):
     """Delete a booking by ID and clean up its token entries.
     

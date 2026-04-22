@@ -111,7 +111,7 @@ class DatabaseService {
 
   static Future<List<QurbaniCategory>> loadCategories() async {
     try {
-      final result = await _get('/categories');
+      final result = await _get('/categories/');
       if (result['success'] == true && result['data'] != null) {
         final List<dynamic> list = result['data'];
         return list.map((e) => QurbaniCategory(
@@ -142,7 +142,7 @@ class DatabaseService {
         'hissah_per_token': cat.hissahPerToken,
       }).toList();
 
-      await _post('/categories/sync', {'categories': body});
+      await _post('/categories/sync/', {'categories': body});
     } catch (e) {
       // Fail silently
     }
@@ -154,7 +154,7 @@ class DatabaseService {
 
   static Future<FormSettings> loadFormSettings() async {
     try {
-      final result = await _get('/settings');
+      final result = await _get('/settings/');
       if (result['success'] == true && result['data'] != null) {
         return FormSettings.fromJson(result['data']);
       }
@@ -166,7 +166,7 @@ class DatabaseService {
 
   static Future<void> saveFormSettings(FormSettings settings) async {
     try {
-      await _put('/settings', settings.toJson());
+      await _put('/settings/', settings.toJson());
     } catch (e) {
       // Fail silently
     }
@@ -190,7 +190,7 @@ class DatabaseService {
     Map<String, dynamic> customFieldsData = const {},
   }) async {
     try {
-      final result = await _post('/bookings', {
+      final result = await _post('/bookings/', {
         'category_title': categoryTitle,
         'amount_per_hissah': amountPerHissah,
         'purpose': purpose,
@@ -211,7 +211,7 @@ class DatabaseService {
 
   static Future<List<Map<String, dynamic>>> loadBookings() async {
     try {
-      final result = await _get('/bookings');
+      final result = await _get('/bookings/');
       if (result['success'] == true && result['data'] != null) {
         return List<Map<String, dynamic>>.from(result['data']);
       }
@@ -227,7 +227,7 @@ class DatabaseService {
 
   static Future<List<Map<String, dynamic>>> loadTokens({String? category}) async {
     try {
-      final endpoint = category != null ? '/tokens?category=$category' : '/tokens';
+      final endpoint = category != null ? '/tokens/?category=$category' : '/tokens/';
       final result = await _get(endpoint);
       if (result['success'] == true && result['data'] != null) {
         return List<Map<String, dynamic>>.from(result['data']);
@@ -240,7 +240,7 @@ class DatabaseService {
 
   static Future<Map<String, dynamic>> markQurbaniDone(int tokenId) async {
     try {
-      final result = await _put('/tokens/$tokenId/qurbani-done', {});
+      final result = await _put('/tokens/$tokenId/qurbani-done/', {});
       return result;
     } catch (e) {
       return {'success': false, 'message': 'Failed to mark qurbani done: $e'};
@@ -249,7 +249,7 @@ class DatabaseService {
 
   static Future<Map<String, dynamic>> markBulkQurbaniDone(List<int> tokenIds) async {
     try {
-      final result = await _put('/tokens/bulk/qurbani-done', {
+      final result = await _put('/tokens/bulk/qurbani-done/', {
         'token_ids': tokenIds,
       });
       return result;
