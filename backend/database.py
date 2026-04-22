@@ -15,11 +15,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 # ── DATABASE URL ──
-# Production: Neon.tech PostgreSQL (set via environment variable or hardcoded)
-# To use local SQLite for development, set DATABASE_URL=sqlite:///./qurbani.db
+# Production: Set via Environment Variable in Render dashboard
+# Local Dev: Uses local SQLite if no environment variable is provided
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://neondb_owner:npg_SH8hznjbs5Uf@ep-still-mode-aopn755a-pooler.c-2.ap-southeast-1.aws.neon.tech/qurbani_db?sslmode=require"
+    "sqlite:///./qurbani.db"
 )
 
 # ── Global write lock — extra concurrency guard ──
