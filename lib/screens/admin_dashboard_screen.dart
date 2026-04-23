@@ -49,6 +49,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     setState(() => _isLoading = true);
     final cats = await DatabaseService.loadCategories();
     final settings = await DatabaseService.loadFormSettings();
+    
+    // Defensive: Clean the logo data if it contains a Data URL prefix
+    if (settings.logoBase64.contains(',')) {
+      settings.logoBase64 = settings.logoBase64.split(',').last;
+    }
+
     setState(() {
       _categories = cats;
       _settings = settings;
@@ -573,7 +579,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Image.memory(
-                                base64Decode(_settings.logoBase64),
+                                base64Decode(_settings.logoBase64.contains(',') ? _settings.logoBase64.split(',').last : _settings.logoBase64),
                                 fit: BoxFit.contain,
                               ),
                             )
@@ -661,7 +667,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(4),
                                   child: Image.memory(
-                                    base64Decode(_settings.logoBase64),
+                                    base64Decode(_settings.logoBase64.contains(',') ? _settings.logoBase64.split(',').last : _settings.logoBase64),
                                     width: 40,
                                     height: 40,
                                     fit: BoxFit.contain,
@@ -742,8 +748,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Future<void> _pickLogo() async {
     final base64Image = await PlatformHelper.instance.pickImageAsBase64();
     if (base64Image != null) {
+      // Handle data URI format: "data:image/png;base64,..."
+      String cleanBase64 = base64Image;
+      if (cleanBase64.contains(',')) {
+        cleanBase64 = cleanBase64.split(',').last;
+      }
+      
       setState(() {
-        _settings.logoBase64 = base64Image;
+        _settings.logoBase64 = cleanBase64;
       });
       _saveSettings();
     }

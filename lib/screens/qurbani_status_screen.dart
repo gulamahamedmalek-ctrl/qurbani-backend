@@ -220,20 +220,17 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
+      floatingActionButton: _buildFloatingActionButton(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       appBar: AppBar(
         title: const Text('Advanced Execution Engine'),
         backgroundColor: _brand,
         actions: [
-          if (_selectedTokenIds.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8),
-              child: ElevatedButton.icon(
-                onPressed: _isMarkingBulk ? null : _markSelectedAsDone,
-                icon: _isMarkingBulk ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: _brand, strokeWidth: 2)) : const Icon(Icons.playlist_add_check, color: _brand),
-                label: Text('Mark ${_selectedTokenIds.length} Done', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.white),
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadTokens,
+            tooltip: 'Refresh Data',
+          ),
         ],
       ),
       body: _isLoading
@@ -252,6 +249,22 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget? _buildFloatingActionButton() {
+    if (_selectedTokenIds.isEmpty) return null;
+
+    return FloatingActionButton.extended(
+      onPressed: _isMarkingBulk ? null : _markSelectedAsDone,
+      backgroundColor: _brand,
+      icon: _isMarkingBulk 
+          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+          : const Icon(Icons.playlist_add_check, color: Colors.white),
+      label: Text(
+        'Mark ${_selectedTokenIds.length} Done', 
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+      ),
     );
   }
 
