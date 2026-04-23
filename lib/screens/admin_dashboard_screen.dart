@@ -265,17 +265,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       dense: true,
                       title: Text(f.label, overflow: TextOverflow.ellipsis),
                       subtitle: Text('Type: ${f.fieldType} • ${f.isRequired ? "Required" : "Optional"}'),
-                      trailing: SizedBox(
-                        width: 96,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(icon: const Icon(Icons.edit, size: 18, color: Colors.blue), onPressed: () => _showCustomFieldForm(f, i), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-                            const SizedBox(width: 8),
-                            IconButton(icon: const Icon(Icons.delete, size: 18, color: Colors.red), onPressed: () { setState(() => _settings.customFields.removeAt(i)); }, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-                          ],
-                        ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 18, color: Colors.blue), 
+                            onPressed: () => _showCustomFieldForm(f, i), 
+                            padding: EdgeInsets.zero, 
+                            constraints: const BoxConstraints()
+                          ),
+                          const SizedBox(width: 12),
+                          IconButton(
+                            icon: const Icon(Icons.delete, size: 18, color: Colors.red), 
+                            onPressed: () { setState(() => _settings.customFields.removeAt(i)); }, 
+                            padding: EdgeInsets.zero, 
+                            constraints: const BoxConstraints()
+                          ),
+                        ],
                       ),
                     );
                   }),
@@ -412,17 +418,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       dense: true,
                       leading: const Icon(Icons.radio_button_checked, size: 20),
                       title: Text(p, overflow: TextOverflow.ellipsis),
-                      trailing: SizedBox(
-                        width: 104,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(icon: const Icon(Icons.edit, size: 18, color: Colors.blue), onPressed: () => _showPurposeForm(p, i), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-                            const SizedBox(width: 8),
-                            IconButton(icon: const Icon(Icons.delete, size: 18, color: Colors.red), onPressed: () { setState(() => _settings.purposes.removeAt(i)); }, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-                          ],
-                        ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 18, color: Colors.blue), 
+                            onPressed: () => _showPurposeForm(p, i), 
+                            padding: EdgeInsets.zero, 
+                            constraints: const BoxConstraints()
+                          ),
+                          const SizedBox(width: 12),
+                          IconButton(
+                            icon: const Icon(Icons.delete, size: 18, color: Colors.red), 
+                            onPressed: () { setState(() => _settings.purposes.removeAt(i)); }, 
+                            padding: EdgeInsets.zero, 
+                            constraints: const BoxConstraints()
+                          ),
+                        ],
                       ),
                     );
                   }),
