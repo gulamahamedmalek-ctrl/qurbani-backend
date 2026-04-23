@@ -209,9 +209,10 @@ class DatabaseService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> loadBookings() async {
+  static Future<List<Map<String, dynamic>>> loadBookings({String? query}) async {
     try {
-      final result = await _get('/bookings/');
+      final endpoint = query != null ? '/bookings/?query=${Uri.encodeComponent(query)}' : '/bookings/';
+      final result = await _get(endpoint);
       if (result['success'] == true && result['data'] != null) {
         return List<Map<String, dynamic>>.from(result['data']);
       }
@@ -219,6 +220,15 @@ class DatabaseService {
       // Fallback silently
     }
     return [];
+  }
+
+  static Future<Map<String, dynamic>> getBookingDetails(int bookingId) async {
+    try {
+      final result = await _get('/bookings/$bookingId/details/');
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to load booking details: $e'};
+    }
   }
 
   // ═══════════════════════════════════════════════════════

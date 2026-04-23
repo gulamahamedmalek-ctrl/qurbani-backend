@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'admin_dashboard_screen.dart';
 import 'hissa_configuration_screen.dart';
 import 'qurbani_status_screen.dart';
+import 'booking_history_screen.dart';
 import 'dart:convert';
 import '../services/database_service.dart';
 import '../models/form_settings.dart';
@@ -178,6 +179,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: Colors.teal.shade800,
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const QurbaniStatusScreen()));
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _buildDashboardCard(
+                context,
+                title: 'Search & History',
+                subtitle: 'Find past bookings and re-download receipts.',
+                icon: Icons.manage_search,
+                color: Colors.indigo.shade700,
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingHistoryScreen()));
                 },
               ),
             ],
