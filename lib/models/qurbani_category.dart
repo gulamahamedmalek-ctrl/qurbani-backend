@@ -3,7 +3,7 @@ class QurbaniCategory {
   final String title;
   final String subtitle;
   final double amount;
-  final int hissahPerToken; // How many names fit in one token (e.g. Cow=7, Goat=1)
+  final int hissahPerToken; // How many names fit in one token (e.g. Large Animal=7, Goat=1)
 
   QurbaniCategory({
     required this.id,

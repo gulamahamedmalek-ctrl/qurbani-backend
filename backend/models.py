@@ -15,7 +15,7 @@ class Category(Base):
     title = Column(String(100), nullable=False)
     subtitle = Column(String(200), default="")
     amount = Column(Float, nullable=False, default=0.0)
-    hissah_per_token = Column(Integer, nullable=False, default=7)  # Cow=7, Goat=1, etc.
+    hissah_per_token = Column(Integer, nullable=False, default=7)  # Large Animal=7, Goat=1, etc.
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

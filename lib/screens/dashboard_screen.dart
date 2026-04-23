@@ -181,19 +181,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const QurbaniStatusScreen()));
                 },
               ),
-
-              const SizedBox(height: 12),
-
-              _buildDashboardCard(
-                context,
-                title: 'Search & History',
-                subtitle: 'Find past bookings and re-download receipts.',
-                icon: Icons.manage_search,
-                color: Colors.indigo.shade700,
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingHistoryScreen()));
-                },
-              ),
             ],
           ),
         ),

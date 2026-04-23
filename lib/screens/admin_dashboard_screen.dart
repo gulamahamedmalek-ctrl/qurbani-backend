@@ -159,7 +159,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 TextFormField(
                   controller: hissahPerTokenCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Hissah Per Token (e.g. Cow=7, Goat=1) *', prefixIcon: Icon(Icons.token)),
+                  decoration: const InputDecoration(labelText: 'Hissah Per Token (e.g. Large Animal=7, Goat=1) *', prefixIcon: Icon(Icons.token)),
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) return 'Hissah Per Token is required';
                     final num = int.tryParse(val.trim());
