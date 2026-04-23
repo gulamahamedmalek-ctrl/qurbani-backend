@@ -42,10 +42,18 @@ def _generate_receipt_no(db: Session) -> str:
 
 
 @router.get("/")
-def list_bookings(db: Session = Depends(get_db)):
-    """Fetch all bookings, newest first."""
+def list_bookings(query: str = None, db: Session = Depends(get_db)):
+    """Fetch all bookings, with optional query filtering by Name, Mobile, or Receipt."""
     try:
-        bookings = db.query(Booking).order_by(Booking.id.desc()).all()
+        q = db.query(Booking)
+        if query:
+            q = q.filter(
+                (Booking.representative_name.ilike(f"%{query}%")) |
+                (Booking.mobile.ilike(f"%{query}%")) |
+                (Booking.receipt_no.ilike(f"%{query}%"))
+            )
+        
+        bookings = q.order_by(Booking.id.desc()).all()
         data = [BookingResponse.model_validate(b).model_dump() for b in bookings]
         return success_response("Bookings fetched", data)
     except Exception as e:
@@ -101,6 +109,40 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
             return success_response("Booking created", data)
         except Exception as e:
             return error_response(f"Failed to create booking: {str(e)}")
+
+
+@router.get("/{booking_id}/details/")
+def get_booking_details(booking_id: int, db: Session = Depends(get_db)):
+    """Fetch a deep profile of a booking, including linked animal tokens."""
+    try:
+        booking = get_or_404(db, Booking, booking_id, "Booking")
+        
+        # Find all token entries for this booking
+        from models import TokenEntry, Token
+        entries = db.query(TokenEntry).filter(TokenEntry.booking_id == booking_id).all()
+        
+        # Enhance entries with Token info (token_no, qurbani_done)
+        hissah_entries = []
+        for e in entries:
+            token = db.query(Token).filter(Token.id == e.token_id).first()
+            hissah_entries.append({
+                "id": e.id,
+                "token_id": e.token_id,
+                "token_no": token.token_no if token else 0,
+                "category_title": token.category_title if token else "",
+                "qurbani_done": token.qurbani_done if token else False,
+                "serial_no": e.serial_no,
+                "owner_name": e.owner_name,
+                "purpose": e.purpose,
+            })
+            
+        data = {
+            "booking": BookingResponse.model_validate(booking).model_dump(),
+            "hissah_entries": hissah_entries
+        }
+        return success_response("Booking details fetched", data)
+    except Exception as e:
+        return error_response(f"Failed to fetch booking details: {str(e)}")
 
 
 @router.get("/{booking_id}/")
