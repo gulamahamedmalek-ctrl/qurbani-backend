@@ -247,31 +247,25 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   Future<void> _reprintReceipt() async {
     if (_booking == null) return;
     
-    // Prepare data for generator
-    final List<String> ownerNames = List<String>.from(jsonDecode(jsonEncode(_hissahEntries)).map((e) => _booking!['customer_name'])); 
-    // Note: In history, we usually want to re-print the whole booking receipt.
-    // The generator needs the specific list of owner names for that booking.
-    
-    // Actually, we can just pass the booking data map if we adapt the generator, 
-    // but for now we'll match the existing interface.
-    
-    // We need to group owner names correctly if one booking has multiple hissah.
-    // Let's just use the customer name for all since they are the one who booked.
-    
-    await ReceiptGenerator.generateAndShow(
-      context: context,
-      settings: _settings,
-      customerName: _booking!['customer_name'] ?? '',
+    final dateStr = _booking!['booking_date'].toString().split('T').first;
+
+    await ReceiptGenerator.generateAndPrint(
       receiptNo: _booking!['receipt_no'] ?? '',
+      date: dateStr,
       categoryTitle: _booking!['category_title'] ?? '',
-      amountPerHissah: (_booking!['amount_per_hissah'] ?? 0).toDouble(),
-      totalAmount: (_booking!['total_amount'] ?? 0).toDouble(),
-      hissahCount: _booking!['hissah_count'] ?? 1,
-      purpose: _booking!['purpose'] ?? '',
       representativeName: _booking!['representative_name'] ?? '',
-      ownerNames: ownerNames,
-      bookingDate: DateTime.parse(_booking!['booking_date']),
-      customFieldsData: _booking!['custom_fields_data'] is Map ? _booking!['custom_fields_data'] as Map<String, dynamic> : {},
+      referenceName: _booking!['booking_reference'] ?? '',
+      ownerNames: List<String>.from(_hissahEntries.map((e) => _booking!['customer_name'])),
+      address: _booking!['address'] ?? '',
+      mobile: _booking!['customer_mobile'] ?? '',
+      purpose: _booking!['purpose'] ?? '',
+      amountPerHissah: (_booking!['amount_per_hissah'] ?? 0).toDouble(),
+      hissahCount: _booking!['hissah_count'] ?? 1,
+      totalAmount: (_booking!['total_amount'] ?? 0).toDouble(),
+      currencySymbol: _settings.currencySymbol,
+      organizationName: _settings.organizationName,
+      logoBase64: _settings.logoBase64,
+      tokenAssignments: _hissahEntries,
     );
   }
 }
