@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
+import '../models/form_settings.dart';
 
 class QurbaniStatusScreen extends StatefulWidget {
   const QurbaniStatusScreen({super.key});
@@ -21,8 +22,10 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
   String _statusFilter = 'All'; // All, Pending, Done
   String _fillStatusFilter = 'All'; // All, Full, Partial, Empty
   String _selectedCategory = 'All';
+  String _selectedReference = 'All';
   String _sortBy = 'Token Number (A-Z)';
   DateTime? _filterDate;
+  FormSettings _settings = FormSettings();
 
   // Batch Selection
   Set<int> _selectedTokenIds = {};
@@ -44,12 +47,14 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
   Future<void> _loadTokens() async {
     setState(() => _isLoading = true);
     final tokens = await DatabaseService.loadTokens();
+    final settings = await DatabaseService.loadFormSettings();
     final cats = tokens.map((t) => t['category_title'].toString()).toSet().toList();
     cats.sort();
     
     setState(() {
       _allTokens = tokens;
       _categories = cats;
+      _settings = settings;
       _isLoading = false;
       // Preserve selection if possible
       _selectedTokenIds.retainWhere((id) => tokens.any((t) => t['id'] == id));
@@ -63,6 +68,14 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     // 1. Category Filter
     if (_selectedCategory != 'All') {
       result = result.where((t) => t['category_title'] == _selectedCategory).toList();
+    }
+
+    // 1.5 Reference Filter
+    if (_settings.referenceAsDropdown && _selectedReference != 'All') {
+      result = result.where((t) {
+        final entries = List<Map<String, dynamic>>.from(t['entries'] ?? []);
+        return entries.any((e) => e['booking_reference'] == _selectedReference);
+      }).toList();
     }
 
     // 2. Execution Status Filter
@@ -145,6 +158,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
       _statusFilter = 'All';
       _fillStatusFilter = 'All';
       _selectedCategory = 'All';
+      _selectedReference = 'All';
       _sortBy = 'Token Number (A-Z)';
       _filterDate = null;
     });
@@ -324,6 +338,10 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                 const SizedBox(width: 10),
                 if (_categories.isNotEmpty) ...[
                   _buildDropdownFilter('Category', ['All', ..._categories], _selectedCategory, (v) { setState(() => _selectedCategory = v!); _applyFilters(); }),
+                  const SizedBox(width: 10),
+                ],
+                if (_settings.referenceAsDropdown && _settings.referenceOptions.isNotEmpty) ...[
+                  _buildDropdownFilter('Reference', ['All', ..._settings.referenceOptions], _selectedReference, (v) { setState(() => _selectedReference = v!); _applyFilters(); }),
                   const SizedBox(width: 10),
                 ],
                 _buildDropdownFilter('Sort', _sortOptions, _sortBy, (v) { setState(() => _sortBy = v!); _applyFilters(); }),
