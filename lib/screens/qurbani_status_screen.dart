@@ -225,13 +225,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
       appBar: AppBar(
         title: const Text('Advanced Execution Engine'),
         backgroundColor: _brand,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadTokens,
-            tooltip: 'Refresh Data',
-          ),
-        ],
+        actions: const [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -405,12 +399,18 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
           // Row 3: Batch Actions Bar
           if (_filteredTokens.any((t) => t['qurbani_done'] != true)) ...[
             const Divider(height: 16),
-            Row(
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text('${_filteredTokens.length} viewable results', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                const Spacer(),
-                TextButton(onPressed: _selectAllPending, child: const Text('Select All Pending')),
-                if (_selectedTokenIds.isNotEmpty) TextButton(onPressed: _clearSelection, child: const Text('Clear Selection', style: TextStyle(color: Colors.red))),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(onPressed: _selectAllPending, child: const Text('Select All Pending')),
+                    if (_selectedTokenIds.isNotEmpty) TextButton(onPressed: _clearSelection, child: const Text('Clear Selection', style: TextStyle(color: Colors.red))),
+                  ],
+                ),
               ],
             )
           ]
