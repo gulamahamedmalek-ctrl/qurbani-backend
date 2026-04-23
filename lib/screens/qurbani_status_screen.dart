@@ -402,15 +402,12 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
             Wrap(
               alignment: WrapAlignment.spaceBetween,
               crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
               children: [
                 Text('${_filteredTokens.length} viewable results', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton(onPressed: _selectAllPending, child: const Text('Select All Pending')),
-                    if (_selectedTokenIds.isNotEmpty) TextButton(onPressed: _clearSelection, child: const Text('Clear Selection', style: TextStyle(color: Colors.red))),
-                  ],
-                ),
+                TextButton(onPressed: _selectAllPending, child: const Text('Select All Pending')),
+                if (_selectedTokenIds.isNotEmpty) 
+                  TextButton(onPressed: _clearSelection, child: const Text('Clear Selection', style: TextStyle(color: Colors.red))),
               ],
             )
           ]

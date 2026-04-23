@@ -261,20 +261,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   ..._settings.customFields.asMap().entries.map((entry) {
                     final i = entry.key;
                     final f = entry.value;
-                    return ListTile(
-                      dense: true,
-                      title: Text(f.label, overflow: TextOverflow.ellipsis),
-                      subtitle: Text('Type: ${f.fieldType} • ${f.isRequired ? "Required" : "Optional"}'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
                         children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(f.label, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                Text('Type: ${f.fieldType} • ${f.isRequired ? "Required" : "Optional"}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              ],
+                            ),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.edit, size: 18, color: Colors.blue), 
                             onPressed: () => _showCustomFieldForm(f, i), 
                             padding: EdgeInsets.zero, 
                             constraints: const BoxConstraints()
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           IconButton(
                             icon: const Icon(Icons.delete, size: 18, color: Colors.red), 
                             onPressed: () { setState(() => _settings.customFields.removeAt(i)); }, 
@@ -414,20 +420,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   ..._settings.purposes.asMap().entries.map((entry) {
                     final i = entry.key;
                     final p = entry.value;
-                    return ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.radio_button_checked, size: 20),
-                      title: Text(p, overflow: TextOverflow.ellipsis),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
                         children: [
+                          const Icon(Icons.radio_button_checked, size: 20, color: Colors.grey),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(p, overflow: TextOverflow.ellipsis),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.edit, size: 18, color: Colors.blue), 
                             onPressed: () => _showPurposeForm(p, i), 
                             padding: EdgeInsets.zero, 
                             constraints: const BoxConstraints()
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           IconButton(
                             icon: const Icon(Icons.delete, size: 18, color: Colors.red), 
                             onPressed: () { setState(() => _settings.purposes.removeAt(i)); }, 
