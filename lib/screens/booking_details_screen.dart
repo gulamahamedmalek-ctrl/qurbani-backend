@@ -141,7 +141,16 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   Widget _buildCustomerCard() {
-    final customData = _booking!['custom_fields_data'] is Map ? _booking!['custom_fields_data'] as Map<String, dynamic> : {};
+    Map<String, dynamic> customData = {};
+    if (_booking!['custom_fields_data'] is String) {
+      try {
+        customData = jsonDecode(_booking!['custom_fields_data']);
+      } catch (e) {
+        customData = {};
+      }
+    } else if (_booking!['custom_fields_data'] is Map) {
+      customData = Map<String, dynamic>.from(_booking!['custom_fields_data']);
+    }
     
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -257,7 +266,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       categoryTitle: _booking!['category_title'] ?? '',
       representativeName: _booking!['representative_name'] ?? '',
       referenceName: _booking!['reference'] ?? '',
-      ownerNames: List<String>.from(_hissahEntries.map((e) => _booking!['representative_name'] ?? 'Owner')),
+      ownerNames: _booking!['owner_names'] is String 
+          ? List<String>.from(jsonDecode(_booking!['owner_names']))
+          : List<String>.from(_hissahEntries.map((e) => _booking!['representative_name'] ?? 'Owner')),
       address: _booking!['address'] ?? '',
       mobile: _booking!['mobile'] ?? '',
       purpose: _booking!['purpose'] ?? '',
