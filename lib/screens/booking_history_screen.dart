@@ -118,7 +118,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(b['customer_name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            Expanded(child: Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
             Text(b['receipt_no'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _brand)),
           ],
         ),
@@ -126,7 +126,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text('Mobile: ${b['customer_mobile'] ?? 'N/A'}', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+            Text('Mobile: ${b['mobile'] ?? 'N/A'}', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
             const SizedBox(height: 4),
             Row(
               children: [

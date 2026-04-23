@@ -42,7 +42,11 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${result['message']}'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error: ${result['message'] ?? "Could not fetch details from server"}'), 
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     }
@@ -154,13 +158,11 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               ],
             ),
             const Divider(height: 24),
-            _buildDetailRow('Name', _booking!['customer_name']),
-            _buildDetailRow('Mobile', _booking!['customer_mobile']),
-            if (_booking!['representative_name'] != null && _booking!['representative_name'].toString().isNotEmpty)
-              _buildDetailRow('Representative', _booking!['representative_name']),
+            _buildDetailRow('Name', _booking!['representative_name']),
+            _buildDetailRow('Mobile', _booking!['mobile']),
             _buildDetailRow('Address', _booking!['address']),
             _buildDetailRow('Purpose', _booking!['purpose']),
-            _buildDetailRow('Reference', _booking!['booking_reference']),
+            _buildDetailRow('Reference', _booking!['reference']),
             
             if (customData.isNotEmpty) ...[
               const Padding(padding: EdgeInsets.only(top: 12, bottom: 8), child: Text('Other Details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey))),
@@ -254,10 +256,10 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       date: dateStr,
       categoryTitle: _booking!['category_title'] ?? '',
       representativeName: _booking!['representative_name'] ?? '',
-      referenceName: _booking!['booking_reference'] ?? '',
-      ownerNames: List<String>.from(_hissahEntries.map((e) => _booking!['customer_name'])),
+      referenceName: _booking!['reference'] ?? '',
+      ownerNames: List<String>.from(_hissahEntries.map((e) => _booking!['representative_name'] ?? 'Owner')),
       address: _booking!['address'] ?? '',
-      mobile: _booking!['customer_mobile'] ?? '',
+      mobile: _booking!['mobile'] ?? '',
       purpose: _booking!['purpose'] ?? '',
       amountPerHissah: (_booking!['amount_per_hissah'] ?? 0).toDouble(),
       hissahCount: _booking!['hissah_count'] ?? 1,
