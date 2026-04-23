@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../models/form_settings.dart';
+import '../services/receipt_generator.dart';
+import 'dart:convert';
 
 class QurbaniStatusScreen extends StatefulWidget {
   const QurbaniStatusScreen({super.key});
@@ -210,6 +212,15 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${result['message']}'), backgroundColor: Colors.red));
     }
+  }
+
+  Future<void> _showBookingDetails(int bookingId) async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _BookingDetailSheet(bookingId: bookingId, settings: _settings),
+    );
   }
 
   // ── Stats ──
@@ -573,9 +584,17 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                             child: Text('${index + 1}', style: TextStyle(fontSize: 12, color: isEmpty ? Colors.grey.shade400 : Colors.grey.shade700, fontWeight: FontWeight.bold))
                           ),
                           Expanded(
-                            child: Text(
-                              isEmpty ? '—' : (e['owner_name'] ?? ''),
-                              style: TextStyle(fontSize: 13, color: isEmpty ? Colors.grey.shade400 : Colors.black87),
+                            child: InkWell(
+                              onTap: isEmpty ? null : () => _showBookingDetails(e['booking_id']),
+                              child: Text(
+                                isEmpty ? '—' : (e['owner_name'] ?? ''),
+                                style: TextStyle(
+                                  fontSize: 13, 
+                                  color: isEmpty ? Colors.grey.shade400 : _brand,
+                                  fontWeight: isEmpty ? FontWeight.normal : FontWeight.bold,
+                                  decoration: isEmpty ? null : TextDecoration.underline,
+                                ),
+                              ),
                             )
                           ),
                           SizedBox(
@@ -618,6 +637,197 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _BookingDetailSheet extends StatefulWidget {
+  final int bookingId;
+  final FormSettings settings;
+  const _BookingDetailSheet({required this.bookingId, required this.settings});
+
+  @override
+  State<_BookingDetailSheet> createState() => _BookingDetailSheetState();
+}
+
+class _BookingDetailSheetState extends State<_BookingDetailSheet> {
+  static const Color _brand = Color(0xFF0D5C46);
+  Map<String, dynamic>? _booking;
+  List<Map<String, dynamic>> _hissahEntries = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDetails();
+  }
+
+  Future<void> _loadDetails() async {
+    final result = await DatabaseService.getBookingDetails(widget.bookingId);
+    if (mounted) {
+      setState(() {
+        if (result['success'] == true) {
+          _booking = result['data']['booking'];
+          _hissahEntries = List<Map<String, dynamic>>.from(result['data']['hissah_entries'] ?? []);
+        }
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          _buildDragHandle(),
+          Expanded(
+            child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: _brand))
+                : _booking == null 
+                    ? const Center(child: Text('Error loading details'))
+                    : _buildContent(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDragHandle() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      width: 40, height: 4,
+      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+    );
+  }
+
+  Widget _buildContent() {
+    final date = DateTime.tryParse(_booking!['booking_date'] ?? '')?.toLocal();
+    final dateStr = date != null ? '${date.day}/${date.month}/${date.year}' : 'N/A';
+    final customData = _booking!['custom_fields_data'] is String 
+        ? (jsonDecode(_booking!['custom_fields_data']) as Map<String, dynamic>) 
+        : (_booking!['custom_fields_data'] as Map<String, dynamic>? ?? {});
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_booking!['representative_name'] ?? 'No Name', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text('Receipt: ${_booking!['receipt_no']}', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              CircleAvatar(
+                backgroundColor: _brand.withOpacity(0.1),
+                radius: 24,
+                child: IconButton(icon: const Icon(Icons.print, color: _brand), onPressed: _reprintReceipt),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildDetailRow(Icons.phone, 'Mobile', _booking!['mobile']),
+          _buildDetailRow(Icons.location_on, 'Address', _booking!['address']),
+          _buildDetailRow(Icons.event, 'Booking Date', dateStr),
+          _buildDetailRow(Icons.info_outline, 'Purpose', _booking!['purpose']),
+          _buildDetailRow(Icons.campaign, 'Reference', _booking!['reference']),
+          
+          if (customData.isNotEmpty) ...[
+            const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
+            const Text('Additional Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 12),
+            ...customData.entries.map((e) => _buildDetailRow(Icons.label_important_outline, e.key, e.value.toString())),
+          ],
+          
+          const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
+          const Text('Animal Slots', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 12),
+          ..._hissahEntries.map((e) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
+            child: Row(
+              children: [
+                Text('Token #${e['token_no']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 12),
+                Text(e['category_title'] ?? ''),
+                const Spacer(),
+                Icon(e['qurbani_done'] == true ? Icons.check_circle : Icons.pending, size: 16, color: e['qurbani_done'] == true ? Colors.green : Colors.orange),
+              ],
+            ),
+          )),
+          const SizedBox(height: 40),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _reprintReceipt,
+              icon: const Icon(Icons.print),
+              label: const Text('RE-PRINT RECEIPT'),
+              style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
+            ),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: Colors.grey.shade400),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
+                Text(value ?? 'N/A', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _reprintReceipt() async {
+    final dateStr = _booking!['booking_date'].toString().split('T').first;
+    await ReceiptGenerator.generateAndPrint(
+      receiptNo: _booking!['receipt_no'] ?? '',
+      date: dateStr,
+      categoryTitle: _booking!['category_title'] ?? '',
+      representativeName: _booking!['representative_name'] ?? '',
+      referenceName: _booking!['reference'] ?? '',
+      ownerNames: _booking!['owner_names'] is String 
+          ? List<String>.from(jsonDecode(_booking!['owner_names']))
+          : List<String>.from(_hissahEntries.map((e) => _booking!['representative_name'] ?? 'Owner')),
+      address: _booking!['address'] ?? '',
+      mobile: _booking!['mobile'] ?? '',
+      purpose: _booking!['purpose'] ?? '',
+      amountPerHissah: (_booking!['amount_per_hissah'] ?? 0).toDouble(),
+      hissahCount: _booking!['hissah_count'] ?? 1,
+      totalAmount: (_booking!['total_amount'] ?? 0).toDouble(),
+      currencySymbol: widget.settings.currencySymbol,
+      organizationName: widget.settings.organizationName,
+      logoBase64: widget.settings.logoBase64,
+      tokenAssignments: _hissahEntries,
     );
   }
 }
