@@ -242,49 +242,6 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     }
   }
 
-  List<Widget> _buildCategorizedList() {
-    final Map<String, List<Map<String, dynamic>>> groups = {};
-    for (var t in _filteredTokens) {
-      final cat = t['category_title'] ?? 'Uncategorized';
-      if (!groups.containsKey(cat)) groups[cat] = [];
-      groups[cat]!.add(t);
-    }
-
-    final List<Widget> listItems = [];
-    final sortedCatNames = groups.keys.toList()..sort();
-
-    for (var catName in sortedCatNames) {
-      listItems.add(_buildCategoryHeader(catName, groups[catName]!.length));
-      for (var token in groups[catName]!) {
-        listItems.add(_buildExpandableTokenRow(token));
-      }
-      listItems.add(const SizedBox(height: 20));
-    }
-    return listItems;
-  }
-
-  Widget _buildCategoryHeader(String title, int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      margin: const EdgeInsets.only(top: 10, bottom: 4),
-      decoration: BoxDecoration(
-        color: _brand.withOpacity(0.05),
-        border: Border(left: BorderSide(color: _brand, width: 4)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _brand, letterSpacing: 1.5)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            decoration: BoxDecoration(color: _brand, borderRadius: BorderRadius.circular(20)),
-            child: Text('$count Animals', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -308,6 +265,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
         ),
         body: TabBarView(
           children: [
+            // TAB 1: LIVE BOARD
             _isLoading
                 ? const Center(child: CircularProgressIndicator(color: _brand))
                 : Column(
@@ -316,9 +274,10 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                       Expanded(
                         child: _filteredTokens.isEmpty
                             ? const Center(child: Text('No tokens found matching filters.', style: TextStyle(color: Colors.grey, fontSize: 16)))
-                            : ListView(
+                            : ListView.builder(
                                 padding: const EdgeInsets.only(bottom: 100),
-                                children: _buildCategorizedList(),
+                                itemCount: _filteredTokens.length,
+                                itemBuilder: (ctx, i) => _buildExpandableTokenRow(_filteredTokens[i]),
                               ),
                       ),
                     ],
@@ -476,6 +435,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     final bool isSelected = _selectedTokenIds.contains(id);
     final entries = List<Map<String, dynamic>>.from(token['entries'] ?? []);
     final int max = token['max_slots'] ?? 7;
+    final int tokenNo = token['token_no'];
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -494,7 +454,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
             });
           },
         ),
-        title: Text('#${token['token_no']} - ${token['category_title']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text('Token #$tokenNo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         subtitle: Text('${token['filled_slots']}/$max Hissah - ${isDone ? "Done" : "Pending"}'),
         children: [
           Container(
@@ -504,19 +464,36 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
               children: [
                 ...List.generate(max, (index) {
                   final e = index < entries.length ? entries[index] : null;
+                  
+                  // Extract info
+                  final ownerName = e == null ? '—' : (e['owner_name'] ?? '');
+                  final category = e == null ? '' : (e['booking_category'] ?? '');
+                  final receipt = e == null ? '' : (e['receipt_no'] ?? '');
+                  
                   return ListTile(
-                    title: Text(e == null ? '—' : (e['owner_name'] ?? '')),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                    leading: CircleAvatar(
+                      backgroundColor: _brand.withOpacity(0.1),
+                      radius: 16,
+                      child: Text('$tokenNo.${index + 1}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)),
+                    ),
+                    title: Text(ownerName, style: TextStyle(color: e == null ? Colors.grey : Colors.black87, fontWeight: FontWeight.w600)),
+                    subtitle: e != null && category.isNotEmpty ? Text('$category • $receipt', style: const TextStyle(fontSize: 12)) : null,
                     onTap: e == null ? null : () => _showBookingDetails(e['booking_id']),
-                    trailing: Text(e == null ? '' : (e['purpose'] ?? '')),
+                    trailing: Text(e == null ? '' : (e['purpose'] ?? ''), style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   );
                 }),
                 if (!isDone)
-                  ElevatedButton(
-                    onPressed: () async {
-                      final res = await DatabaseService.markQurbaniDone(id);
-                      if (res['success'] == true) _loadTokens();
-                    },
-                    child: const Text('Mark Done'),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final res = await DatabaseService.markQurbaniDone(id);
+                        if (res['success'] == true) _loadTokens();
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
+                      child: const Text('Mark Done'),
+                    ),
                   ),
               ],
             ),
