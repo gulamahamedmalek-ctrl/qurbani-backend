@@ -445,6 +445,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
         border: Border.all(color: isSelected ? _brand : Colors.grey.shade200, width: isSelected ? 1.5 : 1),
       ),
       child: ExpansionTile(
+        key: PageStorageKey<String>('token_$id'),
         leading: Checkbox(
           value: isSelected,
           onChanged: (v) {
