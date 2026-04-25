@@ -25,25 +25,23 @@ def assign_names_to_tokens(
     """
     THE MAIN ENGINE — assigns each name to a token slot.
     
-    Rules:
-    1. Find the latest PARTIAL token for this category
+    Rules (UPDATED FOR GLOBAL TOKENS):
+    1. Find the latest PARTIAL token (regardless of category)
     2. Fill its remaining slots first
     3. If all slots are filled, create a NEW token
     4. Repeat until all names are assigned
-    
-    Returns list of assignments: [{token_no, serial_no, owner_name}, ...]
     """
-    # Get hissah_per_token for this category
+    # Get max slots from category, default to 7
     category = db.query(Category).filter(Category.title == category_title).first()
     max_slots = category.hissah_per_token if category else 7
 
     assignments = []
 
     for name in owner_names:
-        # Step 1: Find the latest partial token for this category
+        # Step 1: Find the latest partial token globally
         partial_token = (
             db.query(Token)
-            .filter(Token.category_title == category_title, Token.status == "partial")
+            .filter(Token.status == "partial")
             .order_by(Token.token_no.asc())
             .first()
         )
@@ -64,6 +62,9 @@ def assign_names_to_tokens(
             partial_token.filled_slots = next_serial
             if partial_token.filled_slots >= partial_token.max_slots:
                 partial_token.status = "full"
+            
+            # CRITICAL FIX for 8/7 bug: Flush so the next loop iteration sees the updated status
+            db.flush()
 
             assignments.append({
                 "token_no": partial_token.token_no,
@@ -71,19 +72,18 @@ def assign_names_to_tokens(
                 "owner_name": name,
             })
         else:
-            # Step 3: No partial token — create a NEW one
+            # Step 3: No partial token — create a NEW one globally
             last_token_no = (
                 db.query(func.max(Token.token_no))
-                .filter(Token.category_title == category_title)
                 .scalar()
             ) or 0
 
             new_token = Token(
                 token_no=last_token_no + 1,
-                category_title=category_title,
+                category_title=category_title, # Takes the category of whoever starts it
                 max_slots=max_slots,
                 filled_slots=1,
-                status="full" if max_slots == 1 else "partial",
+                status="full" if max_slots <= 1 else "partial",
             )
             db.add(new_token)
             db.flush() # Ensure new_token.id is available for the entry
@@ -96,6 +96,7 @@ def assign_names_to_tokens(
                 purpose=purpose,
             )
             db.add(entry)
+            db.flush()
 
             assignments.append({
                 "token_no": new_token.token_no,
@@ -103,7 +104,6 @@ def assign_names_to_tokens(
                 "owner_name": name,
             })
 
-    # NO COMMITS HERE — Let the caller (create_booking) commit everything atomically.
     return assignments
 
 

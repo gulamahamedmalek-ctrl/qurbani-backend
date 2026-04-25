@@ -53,6 +53,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     final cats = tokens.map((t) => t['category_title'].toString()).toSet().toList();
     cats.sort();
     
+    if (!mounted) return;
     setState(() {
       _allTokens = tokens;
       _categories = cats;
@@ -241,6 +242,49 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     }
   }
 
+  List<Widget> _buildCategorizedList() {
+    final Map<String, List<Map<String, dynamic>>> groups = {};
+    for (var t in _filteredTokens) {
+      final cat = t['category_title'] ?? 'Uncategorized';
+      if (!groups.containsKey(cat)) groups[cat] = [];
+      groups[cat]!.add(t);
+    }
+
+    final List<Widget> listItems = [];
+    final sortedCatNames = groups.keys.toList()..sort();
+
+    for (var catName in sortedCatNames) {
+      listItems.add(_buildCategoryHeader(catName, groups[catName]!.length));
+      for (var token in groups[catName]!) {
+        listItems.add(_buildExpandableTokenRow(token));
+      }
+      listItems.add(const SizedBox(height: 20));
+    }
+    return listItems;
+  }
+
+  Widget _buildCategoryHeader(String title, int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      margin: const EdgeInsets.only(top: 10, bottom: 4),
+      decoration: BoxDecoration(
+        color: _brand.withOpacity(0.05),
+        border: Border(left: BorderSide(color: _brand, width: 4)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _brand, letterSpacing: 1.5)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(color: _brand, borderRadius: BorderRadius.circular(20)),
+            child: Text('$count Animals', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -251,10 +295,12 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
           title: const Text('Advanced Execution Engine'),
           backgroundColor: _brand,
           elevation: 0,
-          bottom: const TabBar(
+          bottom: TabBar(
             indicatorColor: Colors.white,
             indicatorWeight: 3,
-            tabs: [
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white.withOpacity(0.7),
+            tabs: const [
               Tab(icon: Icon(Icons.dashboard_customize), text: 'LIVE BOARD'),
               Tab(icon: Icon(Icons.history_edu), text: 'ARCHIVE & SEARCH'),
             ],
@@ -262,25 +308,21 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
         ),
         body: TabBarView(
           children: [
-            // TAB 1: LIVE BOARD
             _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: _brand))
                 : Column(
                     children: [
                       _buildAdvancedFilterDashboard(),
                       Expanded(
                         child: _filteredTokens.isEmpty
                             ? const Center(child: Text('No tokens found matching filters.', style: TextStyle(color: Colors.grey, fontSize: 16)))
-                            : ListView.builder(
+                            : ListView(
                                 padding: const EdgeInsets.only(bottom: 100),
-                                itemCount: _filteredTokens.length,
-                                itemBuilder: (ctx, i) => _buildExpandableTokenRow(_filteredTokens[i]),
+                                children: _buildCategorizedList(),
                               ),
                       ),
                     ],
                   ),
-            
-            // TAB 2: HISTORY & ARCHIVE
             _HistoryTab(settings: _settings),
           ],
         ),
@@ -306,17 +348,12 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     );
   }
 
-  // ════════════════════════════════════════════════════════
-  // ADVANCED DASHBOARD WIDGETS
-  // ════════════════════════════════════════════════════════
-
   Widget _buildAdvancedFilterDashboard() {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Row 1: Stats & Global Search
           Row(
             children: [
               Expanded(
@@ -335,7 +372,6 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                   ),
                   onChanged: (v) { _searchQuery = v; _applyFilters(); },
-                  controller: TextEditingController.fromValue(TextEditingValue(text: _searchQuery, selection: TextSelection.collapsed(offset: _searchQuery.length))),
                 ),
               ),
               const SizedBox(width: 12),
@@ -354,10 +390,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
               )
             ],
           ),
-          
           const SizedBox(height: 12),
-          
-          // Row 2: Advanced Filter Dropdowns
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -375,90 +408,38 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                   const SizedBox(width: 10),
                 ],
                 _buildDropdownFilter('Sort', _sortOptions, _sortBy, (v) { setState(() => _sortBy = v!); _applyFilters(); }),
-                
                 const SizedBox(width: 10),
-                // Date Picker Button
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4, left: 2),
-                      child: Text('Booking Date', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+                InkWell(
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _filterDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (d != null) {
+                      setState(() => _filterDate = d);
+                      _applyFilters();
+                    }
+                  },
+                  child: Container(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_month, size: 16, color: Colors.grey.shade700),
+                        const SizedBox(width: 6),
+                        Text(_filterDate != null ? '${_filterDate!.day}/${_filterDate!.month}/${_filterDate!.year}' : 'Date', style: const TextStyle(fontSize: 13)),
+                      ],
                     ),
-                    InkWell(
-                      onTap: () async {
-                        final d = await showDatePicker(
-                          context: context,
-                          initialDate: _filterDate ?? DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2030),
-                          builder: (context, child) => Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: const ColorScheme.light(primary: _brand),
-                            ),
-                            child: child!,
-                          ),
-                        );
-                        if (d != null) {
-                          setState(() => _filterDate = d);
-                          _applyFilters();
-                        }
-                      },
-                      child: Container(
-                        height: 38, // adjusted to match dropdowns
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: _filterDate != null ? _brand : Colors.grey.shade300, width: _filterDate != null ? 1.5 : 1),
-                          borderRadius: BorderRadius.circular(8),
-                          color: _filterDate != null ? _brand.withOpacity(0.05) : Colors.transparent,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.calendar_month, size: 16, color: _filterDate != null ? _brand : Colors.grey.shade700),
-                            const SizedBox(width: 6),
-                            Text(
-                              _filterDate != null ? '${_filterDate!.day}/${_filterDate!.month}/${_filterDate!.year}' : 'All Dates',
-                              style: TextStyle(fontSize: 13, color: _filterDate != null ? _brand : Colors.grey.shade800, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(padding: EdgeInsets.only(bottom: 4), child: Text('', style: TextStyle(fontSize: 11))),
-                    TextButton.icon(
-                      onPressed: _clearFilters,
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('Reset'),
-                    ),
-                  ],
-                ),
+                const SizedBox(width: 10),
+                TextButton(onPressed: _clearFilters, child: const Text('Reset')),
               ],
             ),
           ),
-
-          // Row 3: Batch Actions Bar
-          if (_filteredTokens.any((t) => t['qurbani_done'] != true)) ...[
-            const Divider(height: 16),
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              children: [
-                Text('${_filteredTokens.length} viewable results', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                TextButton(onPressed: _selectAllPending, child: const Text('Select All Pending')),
-                if (_selectedTokenIds.isNotEmpty) 
-                  TextButton(onPressed: _clearSelection, child: const Text('Clear Selection', style: TextStyle(color: Colors.red))),
-              ],
-            )
-          ]
         ],
       ),
     );
@@ -469,33 +450,25 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 4, left: 2),
+          padding: const EdgeInsets.only(bottom: 4),
           child: Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
         ),
         Container(
           height: 38,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: currentValue,
-              icon: const Icon(Icons.arrow_drop_down, size: 16),
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade800, fontWeight: FontWeight.w600),
               items: options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
               onChanged: onChanged,
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
             ),
           ),
         ),
       ],
     );
   }
-
-  // ════════════════════════════════════════════════════════
-  // INLINE EXPANDABLE DATA ROW
-  // ════════════════════════════════════════════════════════
 
   Widget _buildExpandableTokenRow(Map<String, dynamic> token) {
     final bool isDone = token['qurbani_done'] == true;
@@ -510,151 +483,45 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: isSelected ? _brand : Colors.grey.shade200, width: isSelected ? 1.5 : 1),
-        boxShadow: [ BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)) ],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.only(left: 8, right: 16),
-          leading: Checkbox(
-            value: isSelected,
-            activeColor: _brand,
-            onChanged: (v) {
-              setState(() {
-                if (v == true) _selectedTokenIds.add(id);
-                else _selectedTokenIds.remove(id);
-              });
-            },
-          ),
-          title: Row(
-            children: [
-              Container(
-                width: 44,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                decoration: BoxDecoration(color: _brand.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                child: Text('#${token['token_no']}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, color: _brand, fontSize: 13)),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(token['category_title'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), maxLines: 1, softWrap: false, overflow: TextOverflow.fade),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text('${token['filled_slots']}/$max Hissah', style: TextStyle(fontSize: 11, color: Colors.grey.shade600), maxLines: 1, softWrap: false, overflow: TextOverflow.fade),
-                        if (isDone)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(4)),
-                            child: const Text('Done', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.green)),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(4)),
-                            child: const Text('Pending', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.orange)),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          children: [
-            // Expanded content (The Inner Details Table)
-            Container(
-              color: Colors.grey.shade50,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isDone && token['qurbani_done_at'] != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text('Completed on: ${_formatDate(token['qurbani_done_at'].toString())}', style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
-                    ),
-
-                  // Inner table header
-                  Row(
-                    children: [
-                      SizedBox(width: 30, child: Text('No.', style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.bold))),
-                      Expanded(child: Text('Janaab / Owner Name', style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.bold))),
-                      SizedBox(width: 80, child: Text('Purpose', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                  const Divider(),
-
-                  // Inner table rows
-                  ...List.generate(max, (index) {
-                    final e = index < entries.length ? entries[index] : null;
-                    final bool isEmpty = e == null;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 30, 
-                            child: Text('${index + 1}', style: TextStyle(fontSize: 12, color: isEmpty ? Colors.grey.shade400 : Colors.grey.shade700, fontWeight: FontWeight.bold))
-                          ),
-                          Expanded(
-                            child: InkWell(
-                              onTap: isEmpty ? null : () => _showBookingDetails(e['booking_id']),
-                              child: Text(
-                                isEmpty ? '—' : (e['owner_name'] ?? ''),
-                                style: TextStyle(
-                                  fontSize: 13, 
-                                  color: isEmpty ? Colors.grey.shade400 : _brand,
-                                  fontWeight: isEmpty ? FontWeight.normal : FontWeight.bold,
-                                  decoration: isEmpty ? null : TextDecoration.underline,
-                                ),
-                              ),
-                            )
-                          ),
-                          SizedBox(
-                            width: 80, 
-                            child: Text(
-                              isEmpty ? '' : (e['purpose'] ?? ''), 
-                              textAlign: TextAlign.right, 
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600)
-                            )
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-
-                  if (!isDone) ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.check_circle, size: 18),
-                        label: const Text('Mark this Qurbani as Done', style: TextStyle(fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
-                        onPressed: () async {
-                          setState(() => _isMarkingBulk = true); // reuse loading state
-                          final res = await DatabaseService.markQurbaniDone(id);
-                          setState(() => _isMarkingBulk = false);
-                          if (res['success'] == true) {
-                            _selectedTokenIds.remove(id);
-                            await _loadTokens();
-                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Token #$id marked Done!'), backgroundColor: Colors.green));
-                          }
-                        },
-                      ),
-                    ),
-                  ]
-                ],
-              ),
-            )
-          ],
+      child: ExpansionTile(
+        leading: Checkbox(
+          value: isSelected,
+          onChanged: (v) {
+            setState(() {
+              if (v == true) _selectedTokenIds.add(id);
+              else _selectedTokenIds.remove(id);
+            });
+          },
         ),
+        title: Text('#${token['token_no']} - ${token['category_title']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text('${token['filled_slots']}/$max Hissah - ${isDone ? "Done" : "Pending"}'),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.grey.shade50,
+            child: Column(
+              children: [
+                ...List.generate(max, (index) {
+                  final e = index < entries.length ? entries[index] : null;
+                  return ListTile(
+                    title: Text(e == null ? '—' : (e['owner_name'] ?? '')),
+                    onTap: e == null ? null : () => _showBookingDetails(e['booking_id']),
+                    trailing: Text(e == null ? '' : (e['purpose'] ?? '')),
+                  );
+                }),
+                if (!isDone)
+                  ElevatedButton(
+                    onPressed: () async {
+                      final res = await DatabaseService.markQurbaniDone(id);
+                      if (res['success'] == true) _loadTokens();
+                    },
+                    child: const Text('Mark Done'),
+                  ),
+              ],
+            ),
+          )
+        ],
       ),
     );
   }
@@ -698,42 +565,32 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          _buildDragHandle(),
-          Expanded(
-            child: _isLoading 
-                ? const Center(child: CircularProgressIndicator(color: _brand))
-                : _booking == null 
-                    ? const Center(child: Text('Error loading details'))
-                    : _buildContent(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDragHandle() {
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      width: 40, height: 4,
-      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      child: _isLoading 
+          ? const Center(child: CircularProgressIndicator())
+          : _booking == null 
+              ? const Center(child: Text('Error'))
+              : _buildContent(),
     );
   }
 
   Widget _buildContent() {
     final date = DateTime.tryParse(_booking!['booking_date'] ?? '')?.toLocal();
     final dateStr = date != null ? '${date.day}/${date.month}/${date.year}' : 'N/A';
-    final customData = _booking!['custom_fields_data'] is String 
-        ? (jsonDecode(_booking!['custom_fields_data']) as Map<String, dynamic>) 
-        : (_booking!['custom_fields_data'] as Map<String, dynamic>? ?? {});
+    
+    Map<String, dynamic> customData = {};
+    try {
+      if (_booking!['custom_fields_data'] != null) {
+        if (_booking!['custom_fields_data'] is String) {
+          customData = jsonDecode(_booking!['custom_fields_data']);
+        } else {
+          customData = Map<String, dynamic>.from(_booking!['custom_fields_data']);
+        }
+      }
+    } catch (_) {}
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -744,63 +601,112 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_booking!['representative_name'] ?? 'No Name', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text(_booking!['representative_name'] ?? 'No Name', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
                     const SizedBox(height: 4),
-                    Text('Receipt: ${_booking!['receipt_no']}', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold)),
+                    Text('Receipt: ${_booking!['receipt_no']}', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
               ),
-              CircleAvatar(
-                backgroundColor: _brand.withOpacity(0.1),
-                radius: 24,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: _brand.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                 child: IconButton(icon: const Icon(Icons.print, color: _brand), onPressed: _reprintReceipt),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          _buildDetailRow(Icons.phone, 'Mobile', _booking!['mobile']),
-          _buildDetailRow(Icons.location_on, 'Address', _booking!['address']),
-          _buildDetailRow(Icons.event, 'Booking Date', dateStr),
-          _buildDetailRow(Icons.info_outline, 'Purpose', _booking!['purpose']),
-          _buildDetailRow(Icons.campaign, 'Reference', _booking!['reference']),
-          
+          _buildInfoSection('Customer Profile', [
+            _buildDetailRow(Icons.phone, 'Mobile Number', _booking!['mobile']),
+            _buildDetailRow(Icons.location_on, 'Address', _booking!['address']),
+            _buildDetailRow(Icons.calendar_today, 'Booking Date', dateStr),
+          ]),
+          const SizedBox(height: 20),
+          _buildInfoSection('Booking Specifics', [
+            _buildDetailRow(Icons.info_outline, 'Purpose', _booking!['purpose']),
+            _buildDetailRow(Icons.campaign, 'Reference', _booking!['reference']),
+          ]),
           if (customData.isNotEmpty) ...[
-            const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
-            const Text('Additional Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            ...customData.entries.map((e) => _buildDetailRow(Icons.label_important_outline, e.key, e.value.toString())),
+            const SizedBox(height: 20),
+            _buildInfoSection('Additional Details', 
+              customData.entries.map((e) => _buildDetailRow(Icons.label_important_outline, e.key, e.value.toString())).toList()
+            ),
           ],
-          
-          const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
-          const Text('Animal Slots', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 20),
+          const Text('Animal Assignments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
           const SizedBox(height: 12),
           ..._hissahEntries.map((e) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
             child: Row(
               children: [
-                Text('Token #${e['token_no']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(color: _brand.withOpacity(0.1), shape: BoxShape.circle),
+                  child: const Center(child: Icon(Icons.pets, size: 20, color: _brand)),
+                ),
                 const SizedBox(width: 12),
-                Text(e['category_title'] ?? ''),
-                const Spacer(),
-                Icon(e['qurbani_done'] == true ? Icons.check_circle : Icons.pending, size: 16, color: e['qurbani_done'] == true ? Colors.green : Colors.orange),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Token #${e['token_no']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(e['category_title'] ?? 'Large Animal', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: e['qurbani_done'] == true ? Colors.green.shade50 : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    e['qurbani_done'] == true ? 'DONE' : 'PENDING',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: e['qurbani_done'] == true ? Colors.green : Colors.orange),
+                  ),
+                ),
               ],
             ),
           )),
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
+            height: 54,
             child: ElevatedButton.icon(
               onPressed: _reprintReceipt,
               icon: const Icon(Icons.print),
-              label: const Text('RE-PRINT RECEIPT'),
-              style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
+              label: const Text('RE-PRINT & SHARE RECEIPT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _brand,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
+              ),
             ),
           ),
           const SizedBox(height: 40),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey.shade500, letterSpacing: 1.2)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
+          child: Column(children: children),
+        ),
+      ],
     );
   }
 
@@ -816,8 +722,8 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
-                Text(value ?? 'N/A', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade400, fontWeight: FontWeight.bold)),
+                Text(value ?? '—', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
               ],
             ),
           ),
@@ -827,16 +733,16 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
   }
 
   Future<void> _reprintReceipt() async {
-    final dateStr = _booking!['booking_date'].toString().split('T').first;
+    final rawDate = _booking!['booking_date'] ?? DateTime.now().toIso8601String();
+    final dateStr = rawDate.contains('T') ? rawDate.split('T').first : rawDate;
+    
     await ReceiptGenerator.generateAndPrint(
       receiptNo: _booking!['receipt_no'] ?? '',
       date: dateStr,
       categoryTitle: _booking!['category_title'] ?? '',
       representativeName: _booking!['representative_name'] ?? '',
       referenceName: _booking!['reference'] ?? '',
-      ownerNames: _booking!['owner_names'] is String 
-          ? List<String>.from(jsonDecode(_booking!['owner_names']))
-          : List<String>.from(_hissahEntries.map((e) => _booking!['representative_name'] ?? 'Owner')),
+      ownerNames: List<String>.from(_hissahEntries.map((e) => e['owner_name'] ?? 'Owner')),
       address: _booking!['address'] ?? '',
       mobile: _booking!['mobile'] ?? '',
       purpose: _booking!['purpose'] ?? '',
@@ -886,113 +792,58 @@ class _HistoryTabState extends State<_HistoryTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildSearchBar(),
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => _loadBookings(query: v),
+            decoration: InputDecoration(
+              hintText: 'Search by Name, Mobile or Receipt...',
+              prefixIcon: const Icon(Icons.search, color: _brand),
+              filled: true,
+              fillColor: Colors.grey.shade100,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+          ),
+        ),
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: _brand))
               : _bookings.isEmpty
-                  ? _buildEmptyState()
+                  ? Center(child: Text('No history found.', style: TextStyle(color: Colors.grey.shade400)))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: _bookings.length,
-                      itemBuilder: (ctx, i) => _buildBookingCard(_bookings[i]),
+                      itemBuilder: (ctx, i) {
+                        final b = _bookings[i];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade100),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            onTap: () => showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (ctx) => _BookingDetailSheet(bookingId: b['id'], settings: widget.settings),
+                            ),
+                            leading: CircleAvatar(backgroundColor: _brand.withOpacity(0.1), child: const Icon(Icons.person, color: _brand)),
+                            title: Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('Receipt: ${b['receipt_no']}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                            trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                          ),
+                        );
+                      },
                     ),
         ),
       ],
     );
   }
-
-  Widget _buildSearchBar() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      child: TextField(
-        controller: _searchCtrl,
-        onChanged: (v) => _loadBookings(query: v),
-        decoration: InputDecoration(
-          hintText: 'Search Archive by Name, Mobile or Receipt...',
-          hintStyle: const TextStyle(fontSize: 13),
-          fillColor: Colors.grey.shade100,
-          filled: true,
-          prefixIcon: const Icon(Icons.search, color: _brand),
-          suffixIcon: _searchCtrl.text.isNotEmpty 
-            ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () { _searchCtrl.clear(); _loadBookings(); })
-            : null,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.history_edu, size: 80, color: Colors.grey.shade200),
-          const SizedBox(height: 16),
-          Text('No historical records found', style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBookingCard(Map<String, dynamic> b) {
-    final date = DateTime.tryParse(b['booking_date'] ?? '')?.toLocal();
-    final dateStr = date != null ? '${date.day}/${date.month}/${date.year}' : 'Unknown';
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))],
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        onTap: () => _showDetails(b['id']),
-        leading: CircleAvatar(
-          backgroundColor: _brand.withOpacity(0.1),
-          child: const Icon(Icons.receipt_long, color: _brand, size: 20),
-        ),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(child: Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
-            Text(b['receipt_no'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _brand)),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text('Mobile: ${b['mobile'] ?? 'N/A'}', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade400),
-                const SizedBox(width: 4),
-                Text(dateStr, style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
-                const Spacer(),
-                Text('${widget.settings.currencySymbol} ${b['total_amount']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
-              ],
-            ),
-          ],
-        ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
-      ),
-    );
-  }
-
-  void _showDetails(int id) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _BookingDetailSheet(bookingId: id, settings: widget.settings),
-    );
-  }
 }
-
