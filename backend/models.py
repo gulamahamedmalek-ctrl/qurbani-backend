@@ -103,3 +103,11 @@ class TokenEntry(Base):
     @property
     def booking_date(self):
         return self.booking.created_at if self.booking else None
+
+    @property
+    def booking_category(self):
+        return self.booking.category_title if self.booking else None
+
+    @property
+    def receipt_no(self):
+        return self.booking.receipt_no if self.booking else None

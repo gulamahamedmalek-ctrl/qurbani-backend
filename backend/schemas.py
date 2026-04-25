@@ -118,6 +118,8 @@ class TokenEntryResponse(BaseModel):
     purpose: str
     booking_reference: Optional[str] = None
     booking_date: Optional[datetime] = None
+    booking_category: Optional[str] = None
+    receipt_no: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:
