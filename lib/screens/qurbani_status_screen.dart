@@ -489,15 +489,18 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                     padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
                     child: SizedBox(
                       width: double.infinity,
-                      height: 45,
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           final res = await DatabaseService.markQurbaniDone(id);
                           if (res['success'] == true) _loadTokens();
                         },
                         icon: const Icon(Icons.check_circle_outline, size: 20),
-                        label: const Text('MARK QURBANI AS DONE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('MARK QURBANI AS DONE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                        ),
                         style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           backgroundColor: _brand,
                           foregroundColor: Colors.white,
                           elevation: 0,
