@@ -485,14 +485,24 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                 }),
                 if (!isDone)
                   Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final res = await DatabaseService.markQurbaniDone(id);
-                        if (res['success'] == true) _loadTokens();
-                      },
-                      style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
-                      child: const Text('Mark Done'),
+                    padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final res = await DatabaseService.markQurbaniDone(id);
+                          if (res['success'] == true) _loadTokens();
+                        },
+                        icon: const Icon(Icons.check_circle_outline, size: 20),
+                        label: const Text('MARK QURBANI AS DONE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _brand,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
                     ),
                   ),
               ],
