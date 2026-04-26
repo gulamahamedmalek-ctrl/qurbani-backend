@@ -1185,134 +1185,145 @@ class _MoveEntrySheetState extends State<_MoveEntrySheet> {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: DefaultTabController(
-        length: isGroup ? 1 : 2,
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: const BorderRadius.vertical(top: Radius.circular(20))),
-              child: Row(
-                children: [
-                  CircleAvatar(backgroundColor: _brand.withOpacity(0.1), child: const Icon(Icons.person, color: _brand)),
-                  const SizedBox(width: 16),
-                  Expanded(
+      child: Column(
+        children: [
+          // Header — always shown
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: const BorderRadius.vertical(top: Radius.circular(20))),
+            child: Row(
+              children: [
+                CircleAvatar(backgroundColor: _brand.withOpacity(0.1), child: const Icon(Icons.person, color: _brand)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Reassigning', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(isGroup ? '${widget.entries.length} People Selected' : widget.entries.first['owner_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    ],
+                  ),
+                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+              ],
+            ),
+          ),
+          // Body — branch based on group vs single
+          Expanded(
+            child: _isSaving 
+              ? const Center(child: CircularProgressIndicator())
+              : isGroup
+                ? _buildMoveList(availableTokens, requiredSlots)
+                : DefaultTabController(
+                    length: 2,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Reassigning', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        Text(isGroup ? '${widget.entries.length} People Selected' : widget.entries.first['owner_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        TabBar(
+                          labelColor: _brand,
+                          unselectedLabelColor: Colors.grey,
+                          indicatorColor: _brand,
+                          tabs: const [
+                            Tab(text: 'Move to Slot'),
+                            Tab(text: 'Swap Person'),
+                          ],
+                        ),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              _buildMoveList(availableTokens, requiredSlots),
+                              // SWAP TAB
+                              ListView(
+                                padding: const EdgeInsets.all(16),
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(bottom: 16),
+                                    child: Text('Select someone to instantly swap places with:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
+                                  ),
+                                  if (allOtherPeople.isEmpty)
+                                    const Center(child: Text('No one else to swap with.', style: TextStyle(color: Colors.grey))),
+                                  ...allOtherPeople.map((p) => Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      leading: CircleAvatar(backgroundColor: Colors.orange.shade50, child: const Icon(Icons.swap_calls, color: Colors.orange)),
+                                      title: Text(p['owner_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      subtitle: Text('Currently in Token #${p['token_no']}'),
+                                      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                                      onTap: () async {
+                                        setState(() => _isSaving = true);
+                                        final res = await DatabaseService.swapTokenEntries(widget.entries.first['id'], p['id']);
+                                        if (res['success'] == true) {
+                                          Navigator.pop(context);
+                                          widget.onRefresh();
+                                        } else {
+                                          setState(() => _isSaving = false);
+                                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
+                                        }
+                                      },
+                                    ),
+                                  )),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-                ],
-              ),
-            ),
-            TabBar(
-              labelColor: _brand,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: _brand,
-              tabs: [
-                const Tab(text: 'Move to Slot'),
-                if (!isGroup) const Tab(text: 'Swap Person'),
-              ],
-            ),
-            Expanded(
-              child: _isSaving 
-                ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
-                  children: [
-                    // MOVE TAB
-                    ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)),
-                          onPressed: () async {
-                            setState(() => _isSaving = true);
-                            final ids = widget.entries.map((e) => e['id'] as int).toList();
-                            final res = await DatabaseService.bulkMoveEntries(ids, null);
-                            if (res['success'] == true) {
-                              Navigator.pop(context);
-                              widget.onRefresh();
-                            } else {
-                              setState(() => _isSaving = false);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
-                            }
-                          },
-                          icon: const Icon(Icons.add_circle_outline),
-                          label: const Text('Extract into a Brand New Token', style: TextStyle(fontSize: 16)),
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Text('OR MOVE TO EXISTING TOKEN:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
-                        ),
-                        if (availableTokens.isEmpty)
-                          Center(child: Text('No other tokens have $requiredSlots empty slot(s).', style: const TextStyle(color: Colors.grey))),
-                        ...availableTokens.map((t) => Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            leading: CircleAvatar(backgroundColor: Colors.blue.shade50, child: Text('${t['token_no']}', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold))),
-                            title: Text('Token #${t['token_no']} (${t['category_title']})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('${t['max_slots'] - t['filled_slots']} slots free'),
-                            trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                            onTap: () async {
-                              setState(() => _isSaving = true);
-                              final ids = widget.entries.map((e) => e['id'] as int).toList();
-                              final res = await DatabaseService.bulkMoveEntries(ids, t['id']);
-                              if (res['success'] == true) {
-                                Navigator.pop(context);
-                                widget.onRefresh();
-                              } else {
-                                setState(() => _isSaving = false);
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
-                              }
-                            },
-                          ),
-                        )),
-                      ],
-                    ),
-                    
-                    // SWAP TAB
-                    if (!isGroup)
-                      ListView(
-                        padding: const EdgeInsets.all(16),
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 16),
-                            child: Text('Select someone to instantly swap places with:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
-                          ),
-                          if (allOtherPeople.isEmpty)
-                            const Center(child: Text('No one else to swap with.', style: TextStyle(color: Colors.grey))),
-                          ...allOtherPeople.map((p) => Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(backgroundColor: Colors.orange.shade50, child: const Icon(Icons.swap_calls, color: Colors.orange)),
-                              title: Text(p['owner_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('Currently in Token #${p['token_no']}'),
-                              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                              onTap: () async {
-                                setState(() => _isSaving = true);
-                                final res = await DatabaseService.swapTokenEntries(widget.entries.first['id'], p['id']);
-                              if (res['success'] == true) {
-                                Navigator.pop(context);
-                                widget.onRefresh();
-                              } else {
-                                setState(() => _isSaving = false);
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
-                              }
-                            },
-                          ),
-                        )),
-                      ],
-                    ),
-                  ],
-                ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildMoveList(List<Map<String, dynamic>> availableTokens, int requiredSlots) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)),
+          onPressed: () async {
+            setState(() => _isSaving = true);
+            final ids = widget.entries.map((e) => e['id'] as int).toList();
+            final res = await DatabaseService.bulkMoveEntries(ids, null);
+            if (res['success'] == true) {
+              Navigator.pop(context);
+              widget.onRefresh();
+            } else {
+              setState(() => _isSaving = false);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
+            }
+          },
+          icon: const Icon(Icons.add_circle_outline),
+          label: const Text('Extract into a Brand New Token', style: TextStyle(fontSize: 16)),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Text('OR MOVE TO EXISTING TOKEN:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
+        ),
+        if (availableTokens.isEmpty)
+          Center(child: Text('No other tokens have $requiredSlots empty slot(s).', style: const TextStyle(color: Colors.grey))),
+        ...availableTokens.map((t) => Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: CircleAvatar(backgroundColor: Colors.blue.shade50, child: Text('${t['token_no']}', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold))),
+            title: Text('Token #${t['token_no']} (${t['category_title']})', style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('${t['max_slots'] - t['filled_slots']} slots free'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+            onTap: () async {
+              setState(() => _isSaving = true);
+              final ids = widget.entries.map((e) => e['id'] as int).toList();
+              final res = await DatabaseService.bulkMoveEntries(ids, t['id']);
+              if (res['success'] == true) {
+                Navigator.pop(context);
+                widget.onRefresh();
+              } else {
+                setState(() => _isSaving = false);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
+              }
+            },
+          ),
+        )),
+      ],
     );
   }
 }
