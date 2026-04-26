@@ -584,52 +584,53 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                     }
                   }
 
-                  Widget tile = ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (e != null && !isDone)
-                          Checkbox(
-                            value: _selectedEntryIds.contains(e['id']),
-                            onChanged: (v) {
-                              setState(() {
-                                if (v == true) _selectedEntryIds.add(e['id']);
-                                else _selectedEntryIds.remove(e['id']);
-                              });
-                            },
+                  Widget tile = Row(
+                    children: [
+                      if (e != null && !isDone)
+                        Checkbox(
+                          value: _selectedEntryIds.contains(e['id']),
+                          onChanged: (v) {
+                            setState(() {
+                              if (v == true) _selectedEntryIds.add(e['id']);
+                              else _selectedEntryIds.remove(e['id']);
+                            });
+                          },
+                        ),
+                      Expanded(
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                          leading: CircleAvatar(
+                            backgroundColor: _brand.withOpacity(0.1),
+                            radius: 16,
+                            child: Text('$tokenNo.${index + 1}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)),
                           ),
-                        CircleAvatar(
-                          backgroundColor: _brand.withOpacity(0.1),
-                          radius: 16,
-                          child: Text('$tokenNo.${index + 1}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)),
+                          title: Text(ownerName, style: TextStyle(color: e == null ? Colors.grey : Colors.black87, fontWeight: FontWeight.w600)),
+                          subtitle: e != null && category.isNotEmpty ? Text('$category • $receipt${(e['purpose'] != null && e['purpose'].toString().isNotEmpty) ? ' • ${e['purpose']}' : ''}', style: const TextStyle(fontSize: 12)) : null,
+                          onTap: e == null ? null : () => _showBookingDetails(e['booking_id']),
+                          trailing: e == null 
+                            ? null 
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.blue),
+                                    onPressed: () => _moveEntry(e),
+                                    padding: const EdgeInsets.only(left: 8),
+                                    constraints: const BoxConstraints(),
+                                    tooltip: 'Move to another token',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 18, color: _brand),
+                                    onPressed: () => _editEntryName(e),
+                                    padding: const EdgeInsets.only(left: 8),
+                                    constraints: const BoxConstraints(),
+                                    tooltip: 'Edit name',
+                                  ),
+                                ],
+                              ),
                         ),
-                      ],
-                    ),
-                    title: Text(ownerName, style: TextStyle(color: e == null ? Colors.grey : Colors.black87, fontWeight: FontWeight.w600)),
-                    subtitle: e != null && category.isNotEmpty ? Text('$category • $receipt${(e['purpose'] != null && e['purpose'].toString().isNotEmpty) ? ' • ${e['purpose']}' : ''}', style: const TextStyle(fontSize: 12)) : null,
-                    onTap: e == null ? null : () => _showBookingDetails(e['booking_id']),
-                    trailing: e == null 
-                      ? null 
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.blue),
-                              onPressed: () => _moveEntry(e),
-                              padding: const EdgeInsets.only(left: 8),
-                              constraints: const BoxConstraints(),
-                              tooltip: 'Move to another token',
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.edit, size: 18, color: _brand),
-                              onPressed: () => _editEntryName(e),
-                              padding: const EdgeInsets.only(left: 8),
-                              constraints: const BoxConstraints(),
-                              tooltip: 'Edit name',
-                            ),
-                          ],
-                        ),
+                      ),
+                    ],
                   );
 
                   if (isNewReceipt) {

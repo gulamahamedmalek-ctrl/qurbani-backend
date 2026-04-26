@@ -112,6 +112,7 @@ class BookingResponse(BaseModel):
 # ═══════════════════════════════════════════════
 class TokenEntryResponse(BaseModel):
     id: int
+    token_id: int
     serial_no: int
     owner_name: str
     booking_id: Optional[int] = None
