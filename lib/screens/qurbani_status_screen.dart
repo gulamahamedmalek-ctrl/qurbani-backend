@@ -334,18 +334,25 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('$_total Total Tokens', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
-                  Row(
+              Expanded(
+                flex: 2,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('$_pending Pending', style: TextStyle(fontSize: 13, color: Colors.orange.shade700, fontWeight: FontWeight.bold)),
-                      const Text(' / '),
-                      Text('$_done Done', style: TextStyle(fontSize: 13, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+                      Text('$_total Total Tokens', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                      Row(
+                        children: [
+                          Text('$_pending Pending', style: TextStyle(fontSize: 13, color: Colors.orange.shade700, fontWeight: FontWeight.bold)),
+                          const Text(' / '),
+                          Text('$_done Done', style: TextStyle(fontSize: 13, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
               )
             ],
           ),
