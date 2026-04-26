@@ -278,4 +278,60 @@ def edit_entry_name(entry_id: int, req: EditEntryRequest, db: Session = Depends(
         
         return success_response("Name updated successfully")
     except Exception as e:
-        return error_response(f"Failed to edit name: {str(e)}")
+        return error_response(f"Failed to update entry: {str(e)}")
+
+class MoveEntryRequest(BaseModel):
+    new_token_id: int
+
+@router.put("/entries/{entry_id}/move")
+def move_entry_to_token(entry_id: int, req: MoveEntryRequest, db: Session = Depends(get_db)):
+    """Manually move a person from their current token to a different token."""
+    from database import booking_lock
+    
+    with booking_lock:
+        try:
+            entry = db.query(TokenEntry).filter(TokenEntry.id == entry_id).first()
+            if not entry:
+                return error_response("Token entry not found")
+            
+            old_token_id = entry.token_id
+            if old_token_id == req.new_token_id:
+                return error_response("Entry is already in this token.")
+                
+            old_token = db.query(Token).filter(Token.id == old_token_id).first()
+            new_token = db.query(Token).filter(Token.id == req.new_token_id).first()
+            
+            if not new_token:
+                return error_response("Destination token not found")
+                
+            if new_token.filled_slots >= new_token.max_slots:
+                return error_response("Destination token is already full.")
+                
+            # 1. Update the entry's token_id and set to the end of the new token
+            entry.token_id = new_token.id
+            entry.serial_no = new_token.filled_slots + 1
+            db.flush()
+            
+            # 2. Repack the old token's remaining entries
+            if old_token:
+                remaining_entries = db.query(TokenEntry).filter(TokenEntry.token_id == old_token.id).order_by(TokenEntry.id).all()
+                for idx, r_entry in enumerate(remaining_entries):
+                    r_entry.serial_no = idx + 1
+                
+                actual_count = len(remaining_entries)
+                if actual_count == 0:
+                    db.delete(old_token)
+                else:
+                    old_token.filled_slots = actual_count
+                    old_token.status = "full" if actual_count >= old_token.max_slots else "partial"
+            
+            # 3. Update the new token's counts
+            new_token.filled_slots += 1
+            if new_token.filled_slots >= new_token.max_slots:
+                new_token.status = "full"
+                
+            safe_commit(db, "Failed to move token entry")
+            return success_response(f"Successfully moved to Token #{new_token.token_no}")
+            
+        except Exception as e:
+            return error_response(f"Failed to move token: {str(e)}")
