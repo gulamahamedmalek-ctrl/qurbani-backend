@@ -335,3 +335,126 @@ def move_entry_to_token(entry_id: int, req: MoveEntryRequest, db: Session = Depe
             
         except Exception as e:
             return error_response(f"Failed to move token: {str(e)}")
+
+class SwapRequest(BaseModel):
+    entry1_id: int
+    entry2_id: int
+
+@router.post("/swap")
+def swap_entries(req: SwapRequest, db: Session = Depends(get_db)):
+    """Swap two people between their tokens, even if both tokens are full."""
+    from database import booking_lock
+    with booking_lock:
+        try:
+            entry1 = db.query(TokenEntry).filter(TokenEntry.id == req.entry1_id).first()
+            entry2 = db.query(TokenEntry).filter(TokenEntry.id == req.entry2_id).first()
+            
+            if not entry1 or not entry2:
+                return error_response("One or both entries not found")
+                
+            token1 = db.query(Token).filter(Token.id == entry1.token_id).first()
+            token2 = db.query(Token).filter(Token.id == entry2.token_id).first()
+            
+            if token1.qurbani_done or token2.qurbani_done:
+                return error_response("Cannot swap because one of the tokens is already marked as DONE.")
+                
+            # Perform the swap!
+            temp_token_id = entry1.token_id
+            temp_serial_no = entry1.serial_no
+            
+            entry1.token_id = entry2.token_id
+            entry1.serial_no = entry2.serial_no
+            
+            entry2.token_id = temp_token_id
+            entry2.serial_no = temp_serial_no
+            
+            safe_commit(db, "Failed to swap entries")
+            return success_response("Successfully swapped the two entries.")
+        except Exception as e:
+            return error_response(f"Failed to swap: {str(e)}")
+
+class BulkMoveRequest(BaseModel):
+    entry_ids: list[int]
+    target_token_id: int | None = None # If None, creates a new token
+
+@router.post("/move_bulk")
+def bulk_move_entries(req: BulkMoveRequest, db: Session = Depends(get_db)):
+    """Move an entire group of people into a token, or start a brand new token for them."""
+    from database import booking_lock
+    from sqlalchemy import func
+    
+    if not req.entry_ids:
+        return error_response("No entries selected")
+        
+    with booking_lock:
+        try:
+            entries = db.query(TokenEntry).filter(TokenEntry.id.in_(req.entry_ids)).all()
+            if len(entries) != len(req.entry_ids):
+                return error_response("Some entries were not found.")
+                
+            # Gather old tokens and check if any are done
+            old_token_ids = set(e.token_id for e in entries)
+            for tid in old_token_ids:
+                t = db.query(Token).filter(Token.id == tid).first()
+                if t and t.qurbani_done:
+                    return error_response(f"Cannot move. Token #{t.token_no} is already marked as DONE.")
+            
+            # Setup Target Token
+            target_token = None
+            if req.target_token_id:
+                target_token = db.query(Token).filter(Token.id == req.target_token_id).first()
+                if not target_token:
+                    return error_response("Target token not found.")
+                if target_token.qurbani_done:
+                    return error_response("Target token is already marked as DONE.")
+                if target_token.max_slots - target_token.filled_slots < len(entries):
+                    return error_response(f"Target token does not have enough free space for {len(entries)} people.")
+            else:
+                # Create a brand new token!
+                # We assume the category of the first entry being moved
+                sample_entry = entries[0]
+                sample_token = db.query(Token).filter(Token.id == sample_entry.token_id).first()
+                cat_title = sample_token.category_title if sample_token else "Large Animal"
+                cat = db.query(Category).filter(Category.title == cat_title).first()
+                max_s = cat.hissah_per_token if cat else 7
+                
+                last_no = db.query(func.max(Token.token_no)).scalar() or 0
+                target_token = Token(
+                    token_no=last_no + 1,
+                    category_title=cat_title,
+                    max_slots=max_s,
+                    filled_slots=0,
+                    status="partial"
+                )
+                db.add(target_token)
+                db.flush()
+                
+            # Move the entries
+            for e in entries:
+                e.token_id = target_token.id
+                e.serial_no = target_token.filled_slots + 1
+                target_token.filled_slots += 1
+                
+            target_token.status = "full" if target_token.filled_slots >= target_token.max_slots else "partial"
+            db.flush()
+            
+            # Repack the old tokens
+            for tid in old_token_ids:
+                if tid == target_token.id: continue # Rare case where they move within same token?
+                t = db.query(Token).filter(Token.id == tid).first()
+                if t:
+                    rem = db.query(TokenEntry).filter(TokenEntry.token_id == t.id).order_by(TokenEntry.id).all()
+                    for idx, r_entry in enumerate(rem):
+                        r_entry.serial_no = idx + 1
+                    ac = len(rem)
+                    if ac == 0:
+                        db.delete(t)
+                    else:
+                        t.filled_slots = ac
+                        t.status = "full" if ac >= t.max_slots else "partial"
+                        
+            safe_commit(db, "Failed to perform bulk move")
+            return success_response(f"Successfully moved {len(entries)} people to Token #{target_token.token_no}")
+            
+        except Exception as e:
+            return error_response(f"Failed to perform bulk move: {str(e)}")
