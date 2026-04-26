@@ -3,7 +3,6 @@ import '../services/database_service.dart';
 import '../models/form_settings.dart';
 import '../services/receipt_generator.dart';
 import 'customer_details_screen.dart';
-import 'token_reassignment_screen.dart';
 import 'dart:convert';
 
 class QurbaniStatusScreen extends StatefulWidget {
@@ -256,15 +255,6 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
           title: const Text('Advanced Execution Engine', style: TextStyle(fontSize: 18)),
           backgroundColor: _brand,
           elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.dashboard_customize_outlined),
-              tooltip: 'Visual Shuffling Board',
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (ctx) => const TokenReassignmentScreen())).then((_) => _loadTokens());
-              },
-            ),
-          ],
           bottom: TabBar(
             indicatorColor: Colors.white,
             indicatorWeight: 3,
@@ -493,7 +483,12 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
   }
 
   void _moveEntry(Map<String, dynamic> entry) {
-    Navigator.push(context, MaterialPageRoute(builder: (ctx) => const TokenReassignmentScreen())).then((_) => _loadTokens());
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _MoveEntrySheet(entry: entry, allTokens: _allTokens, onRefresh: _loadTokens),
+    );
   }
 
   Widget _buildExpandableTokenRow(Map<String, dynamic> token) {
