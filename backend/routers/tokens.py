@@ -216,3 +216,39 @@ def bulk_mark_qurbani_done(req: BulkTokenRequest, db: Session = Depends(get_db))
         return success_response(f"Qurbani marked as done for {len(tokens)} tokens")
     except Exception as e:
         return error_response(f"Failed to perform bulk update: {str(e)}")
+
+class EditEntryRequest(BaseModel):
+    new_name: str
+
+@router.put("/entries/{entry_id}")
+def edit_entry_name(entry_id: int, req: EditEntryRequest, db: Session = Depends(get_db)):
+    """Edit the owner name of a specific hissah in a token and sync with original booking."""
+    try:
+        entry = db.query(TokenEntry).filter(TokenEntry.id == entry_id).first()
+        if not entry:
+            return error_response("Token entry not found")
+
+        # Get all entries for this booking ordered by ID to find the correct index
+        if entry.booking_id:
+            booking = db.query(Booking).filter(Booking.id == entry.booking_id).first()
+            if booking and booking.owner_names:
+                all_entries = db.query(TokenEntry).filter(TokenEntry.booking_id == booking.id).order_by(TokenEntry.id).all()
+                try:
+                    # Find index of this specific entry
+                    entry_index = [e.id for e in all_entries].index(entry.id)
+                    
+                    import json
+                    owner_names = json.loads(booking.owner_names)
+                    if 0 <= entry_index < len(owner_names):
+                        owner_names[entry_index] = req.new_name
+                        booking.owner_names = json.dumps(owner_names)
+                except (ValueError, json.JSONDecodeError):
+                    pass # Ignore if JSON is corrupt or index not found
+
+        # Update the entry itself
+        entry.owner_name = req.new_name
+        safe_commit(db, "Failed to update owner name")
+        
+        return success_response("Name updated successfully")
+    except Exception as e:
+        return error_response(f"Failed to edit name: {str(e)}")
