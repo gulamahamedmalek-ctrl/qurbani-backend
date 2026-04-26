@@ -196,8 +196,11 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
                         r_entry.serial_no = index + 1
                     
                     actual_count = len(remaining_entries)
-                    token.filled_slots = actual_count
-                    token.status = "full" if actual_count >= token.max_slots else "partial"
+                    if actual_count == 0:
+                        db.delete(token)
+                    else:
+                        token.filled_slots = actual_count
+                        token.status = "full" if actual_count >= token.max_slots else "partial"
             
             # Step 4: Delete the booking itself
             db.delete(booking)

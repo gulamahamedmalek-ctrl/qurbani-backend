@@ -124,7 +124,10 @@ def list_tokens(category: str = None, db: Session = Depends(get_db)):
         needs_commit = False
         for t in tokens:
             actual_count = len(t.entries)
-            if t.filled_slots != actual_count:
+            if actual_count == 0:
+                db.delete(t)
+                needs_commit = True
+            elif t.filled_slots != actual_count:
                 t.filled_slots = actual_count
                 t.status = "full" if actual_count >= t.max_slots else "partial"
                 needs_commit = True
@@ -132,6 +135,13 @@ def list_tokens(category: str = None, db: Session = Depends(get_db)):
         if needs_commit:
             from utils import safe_commit
             safe_commit(db, "Auto-healing token counts")
+            
+        # Re-query if we deleted anything, so the response is accurate
+        if needs_commit:
+            query = db.query(Token).order_by(Token.token_no)
+            if category:
+                query = query.filter(Token.category_title == category)
+            tokens = query.all()
             
         data = [TokenResponse.model_validate(t).model_dump() for t in tokens]
         return success_response("Tokens fetched", data)

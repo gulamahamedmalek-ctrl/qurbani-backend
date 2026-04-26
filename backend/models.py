@@ -111,3 +111,7 @@ class TokenEntry(Base):
     @property
     def receipt_no(self):
         return self.booking.receipt_no if self.booking else None
+
+    @property
+    def representative_name(self):
+        return self.booking.representative_name if self.booking else None

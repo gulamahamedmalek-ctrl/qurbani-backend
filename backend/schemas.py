@@ -120,6 +120,7 @@ class TokenEntryResponse(BaseModel):
     booking_date: Optional[datetime] = None
     booking_category: Optional[str] = None
     receipt_no: Optional[str] = None
+    representative_name: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:
