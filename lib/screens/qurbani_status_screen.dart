@@ -525,6 +525,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                   final ownerName = e == null ? '—' : (e['owner_name'] ?? '');
                   final category = e == null ? '' : (e['booking_category'] ?? '');
                   final receipt = e == null ? '' : (e['receipt_no'] ?? '');
+                  final repName = e == null ? '' : (e['representative_name'] ?? '');
                   
                   // Detect if this is a new booking boundary
                   bool isNewReceipt = false;
@@ -576,7 +577,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                             children: [
                               const Icon(Icons.receipt_long, size: 14, color: _brand),
                               const SizedBox(width: 6),
-                              Text('Receipt $receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _brand)),
+                              Text(repName.isNotEmpty ? 'Receipt $receipt  •  $repName' : 'Receipt $receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _brand)),
                             ],
                           ),
                         ),
