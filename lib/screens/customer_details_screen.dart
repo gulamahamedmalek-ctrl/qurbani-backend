@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
 import '../models/form_settings.dart';
 import '../services/database_service.dart';
@@ -9,12 +10,16 @@ class CustomerDetailsScreen extends StatefulWidget {
   final String qurbaniSize;
   final double portionAmount;
   final int hissahPerToken;
+  final Map<String, dynamic>? existingBooking;
+  final List<dynamic>? existingEntries;
 
   const CustomerDetailsScreen({
     super.key,
     required this.qurbaniSize,
     required this.portionAmount,
     this.hissahPerToken = 7,
+    this.existingBooking,
+    this.existingEntries,
   });
 
   @override
@@ -52,8 +57,29 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _ownerNameControllers.add(TextEditingController());
-    _hissahCountController.text = '1';
+    
+    if (widget.existingBooking != null) {
+      final b = widget.existingBooking!;
+      _repNameController.text = b['representative_name'] ?? '';
+      _addressController.text = b['address'] ?? '';
+      _mobileController.text = b['mobile'] ?? '';
+      _referenceController.text = b['reference'] ?? '';
+      _hissahCountController.text = (b['hissah_count'] ?? 1).toString();
+      _selectedPurpose = b['purpose'] ?? '';
+      _receiptNo = b['receipt_no'] ?? '';
+      
+      if (widget.existingEntries != null && widget.existingEntries!.isNotEmpty) {
+        for (var e in widget.existingEntries!) {
+          _ownerNameControllers.add(TextEditingController(text: e['owner_name']));
+        }
+      } else {
+        _ownerNameControllers.add(TextEditingController());
+      }
+    } else {
+      _ownerNameControllers.add(TextEditingController());
+      _hissahCountController.text = '1';
+    }
+
     _hissahCountController.addListener(_calculateTotal);
     _loadSettings();
   }
@@ -62,12 +88,41 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     final settings = await DatabaseService.loadFormSettings();
     setState(() {
       _settings = settings;
-      _selectedPurpose = settings.purposes.isNotEmpty ? settings.purposes.first : '';
-      _receiptNo = '${settings.receiptPrefix}1001';
+      
+      if (widget.existingBooking == null) {
+        _selectedPurpose = settings.purposes.isNotEmpty ? settings.purposes.first : '';
+        _receiptNo = '${settings.receiptPrefix}1001';
+      } else {
+        if (_selectedPurpose.isEmpty && settings.purposes.isNotEmpty) {
+          _selectedPurpose = settings.purposes.first;
+        }
+      }
 
       // Initialize custom field controllers
       for (final field in settings.customFields) {
         _customFieldControllers[field.id] = TextEditingController();
+      }
+
+      if (widget.existingBooking != null && widget.existingBooking!['custom_fields_data'] != null) {
+        try {
+          final customData = widget.existingBooking!['custom_fields_data'];
+          Map<String, dynamic> parsedData = {};
+          if (customData is String) {
+            parsedData = jsonDecode(customData);
+          } else {
+            parsedData = Map<String, dynamic>.from(customData);
+          }
+          
+          for (final field in settings.customFields) {
+            if (parsedData.containsKey(field.label)) {
+              if (field.fieldType == 'dropdown') {
+                _customDropdownValues[field.id] = parsedData[field.label]?.toString();
+              } else {
+                _customFieldControllers[field.id]?.text = parsedData[field.label]?.toString() ?? '';
+              }
+            }
+          }
+        } catch (_) {}
       }
 
       _isLoading = false;
@@ -406,28 +461,53 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     if (field.fieldType == 'dropdown') {
                       customData[field.label] = _customDropdownValues[field.id] ?? '';
                     } else {
-                      customData[field.label] = _customFieldControllers[field.id]?.text?.trim() ?? '';
+                      customData[field.label] = _customFieldControllers[field.id]?.text.trim() ?? '';
                     }
                   }
 
-                  final result = await DatabaseService.createBooking(
-                    categoryTitle: widget.qurbaniSize,
-                    amountPerHissah: widget.portionAmount,
-                    purpose: _selectedPurpose,
-                    representativeName: _repNameController.text.trim(),
-                    ownerNames: ownerNames,
-                    hissahCount: int.tryParse(_hissahCountController.text) ?? 1,
-                    totalAmount: _totalAmount,
-                    address: _addressController.text.trim(),
-                    mobile: _mobileController.text.trim(),
-                    reference: _referenceController.text.trim(),
-                    customFieldsData: customData,
-                  );
+                  if (widget.existingBooking != null) {
+                    final payload = {
+                      'category_title': widget.qurbaniSize,
+                      'amount_per_hissah': widget.portionAmount,
+                      'purpose': _selectedPurpose,
+                      'representative_name': _repNameController.text.trim(),
+                      'owner_names': ownerNames,
+                      'hissah_count': int.tryParse(_hissahCountController.text) ?? 1,
+                      'total_amount': _totalAmount,
+                      'address': _addressController.text.trim(),
+                      'mobile': _mobileController.text.trim(),
+                      'reference': _referenceController.text.trim(),
+                      'custom_fields_data': customData,
+                    };
+                    final result = await DatabaseService.editBooking(widget.existingBooking!['id'], payload);
+                    
+                    if (!mounted) return;
+                    setState(() => _isSubmitting = false);
+                    
+                    if (result['success'] == true) {
+                       Navigator.pop(context, true);
+                    } else {
+                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${result['message']}'), backgroundColor: Colors.red));
+                    }
+                  } else {
+                    final result = await DatabaseService.createBooking(
+                      categoryTitle: widget.qurbaniSize,
+                      amountPerHissah: widget.portionAmount,
+                      purpose: _selectedPurpose,
+                      representativeName: _repNameController.text.trim(),
+                      ownerNames: ownerNames,
+                      hissahCount: int.tryParse(_hissahCountController.text) ?? 1,
+                      totalAmount: _totalAmount,
+                      address: _addressController.text.trim(),
+                      mobile: _mobileController.text.trim(),
+                      reference: _referenceController.text.trim(),
+                      customFieldsData: customData,
+                    );
 
-                  if (!mounted) return;
-                  setState(() => _isSubmitting = false);
+                    if (!mounted) return;
+                    setState(() => _isSubmitting = false);
 
-                  if (result['success'] == true) {
+                    if (result['success'] == true) {
                     final receiptNo = result['data']?['receipt_no'] ?? '';
                     final tokenAssignments = (result['data']?['token_assignments'] as List<dynamic>?)
                         ?.map((a) => Map<String, dynamic>.from(a))
@@ -474,6 +554,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                         backgroundColor: Colors.red,
                       ),
                     );
+                  }
                   }
                 },
                 child: _isSubmitting
