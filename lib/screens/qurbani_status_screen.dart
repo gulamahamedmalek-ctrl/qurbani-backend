@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../models/form_settings.dart';
 import '../services/receipt_generator.dart';
+import 'customer_details_screen.dart';
 import 'dart:convert';
 
 class QurbaniStatusScreen extends StatefulWidget {
@@ -688,51 +689,15 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
   }
 
   Future<void> _editBookingDetails() async {
-    final mobileCtrl = TextEditingController(text: _booking!['mobile']);
-    final amountCtrl = TextEditingController(text: _booking!['amount_per_hissah']?.toString());
-    final addressCtrl = TextEditingController(text: _booking!['address']);
-    
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Booking Details', style: TextStyle(color: _brand)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: mobileCtrl, decoration: const InputDecoration(labelText: 'Mobile Number')),
-              TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address')),
-              TextField(controller: amountCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Amount per Hissah')),
-              const SizedBox(height: 16),
-              const Text('Note: To change names, edit them directly from the Live Tracking Board.', style: TextStyle(fontSize: 11, color: Colors.grey)),
-            ],
-          ),
+    final saved = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomerDetailsScreen(
+          qurbaniSize: _booking!['category_title'] ?? 'Large Animal',
+          portionAmount: double.tryParse(_booking!['amount_per_hissah']?.toString() ?? '0') ?? 0.0,
+          existingBooking: _booking,
+          existingEntries: _hissahEntries,
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
-            onPressed: () async {
-              final payload = {
-                'mobile': mobileCtrl.text,
-                'address': addressCtrl.text,
-                'amount_per_hissah': double.tryParse(amountCtrl.text) ?? 0,
-                'purpose': _booking!['purpose'],
-                'representative_name': _booking!['representative_name'],
-                'total_amount': (double.tryParse(amountCtrl.text) ?? 0) * (_booking!['hissah_count'] ?? 1),
-                'reference': _booking!['reference'],
-                'custom_fields_data': _booking!['custom_fields_data'],
-              };
-              final res = await DatabaseService.editBooking(widget.bookingId, payload);
-              if (res['success'] == true) {
-                Navigator.pop(ctx, true);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${res['message']}'), backgroundColor: Colors.red));
-              }
-            },
-            child: const Text('Save Changes'),
-          ),
-        ],
       ),
     );
 
@@ -827,15 +792,15 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                 Container(
                   width: 40, height: 40,
                   decoration: BoxDecoration(color: _brand.withOpacity(0.1), shape: BoxShape.circle),
-                  child: const Center(child: Icon(Icons.pets, size: 20, color: _brand)),
+                  child: const Center(child: Icon(Icons.person, size: 20, color: _brand)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Token #${e['token_no']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text(e['category_title'] ?? 'Large Animal', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                      Text('${e['owner_name']} (${_booking!['representative_name']})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Token #${e['token_no']}  •  ${e['category_title'] ?? 'Large Animal'}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                     ],
                   ),
                 ),
