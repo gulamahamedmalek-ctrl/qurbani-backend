@@ -486,7 +486,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                 }),
                 if (!isDone)
                   Padding(
-                    padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+                    padding: const EdgeInsets.only(top: 16.0, bottom: 4.0),
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -494,17 +494,18 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                           final res = await DatabaseService.markQurbaniDone(id);
                           if (res['success'] == true) _loadTokens();
                         },
-                        icon: const Icon(Icons.check_circle_outline, size: 20),
-                        label: const FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text('MARK QURBANI AS DONE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text(
+                          'MARK AS DONE', 
+                          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 13),
+                          maxLines: 1,
                         ),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                           backgroundColor: _brand,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                         ),
                       ),
                     ),
