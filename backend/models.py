@@ -74,7 +74,7 @@ class Token(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationship to entries
-    entries = relationship("TokenEntry", back_populates="token", cascade="all, delete-orphan")
+    entries = relationship("TokenEntry", back_populates="token", cascade="all, delete-orphan", order_by="TokenEntry.serial_no")
 
 
 class TokenEntry(Base):
