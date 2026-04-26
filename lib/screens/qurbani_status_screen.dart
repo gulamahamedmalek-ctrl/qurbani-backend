@@ -504,6 +504,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
           return AlertDialog(
             title: const Text('Move to Token', style: TextStyle(fontWeight: FontWeight.bold, color: _brand)),
             content: DropdownButtonFormField<int>(
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Select Destination Token'),
               value: selectedTokenId,
               items: availableTokens.map((t) => DropdownMenuItem<int>(
@@ -604,14 +605,13 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                       child: Text('$tokenNo.${index + 1}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)),
                     ),
                     title: Text(ownerName, style: TextStyle(color: e == null ? Colors.grey : Colors.black87, fontWeight: FontWeight.w600)),
-                    subtitle: e != null && category.isNotEmpty ? Text('$category • $receipt', style: const TextStyle(fontSize: 12)) : null,
+                    subtitle: e != null && category.isNotEmpty ? Text('$category • $receipt${(e['purpose'] != null && e['purpose'].toString().isNotEmpty) ? ' • ${e['purpose']}' : ''}', style: const TextStyle(fontSize: 12)) : null,
                     onTap: e == null ? null : () => _showBookingDetails(e['booking_id']),
                     trailing: e == null 
                       ? null 
                       : Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(e['purpose'] ?? '', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                             IconButton(
                               icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.blue),
                               onPressed: () => _moveEntry(e),
