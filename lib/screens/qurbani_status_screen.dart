@@ -216,12 +216,14 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
   }
 
   Future<void> _showBookingDetails(int bookingId) async {
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _BookingDetailSheet(bookingId: bookingId, settings: _settings),
     );
+    // Automatically refresh token list when the bottom sheet closes (e.g., after cancel/edit)
+    _loadTokens();
   }
 
   // ── Stats ──
@@ -1035,12 +1037,16 @@ class _HistoryTabState extends State<_HistoryTab> {
                           ),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            onTap: () => showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (ctx) => _BookingDetailSheet(bookingId: b['id'], settings: widget.settings),
-                            ),
+                            onTap: () async {
+                              await showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (ctx) => _BookingDetailSheet(bookingId: b['id'], settings: widget.settings),
+                              );
+                              // Refresh history when sheet closes
+                              _loadBookings();
+                            },
                             leading: CircleAvatar(backgroundColor: _brand.withOpacity(0.1), child: const Icon(Icons.person, color: _brand)),
                             title: Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text('Receipt: ${b['receipt_no']}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
