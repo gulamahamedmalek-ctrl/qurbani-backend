@@ -38,13 +38,12 @@ def assign_names_to_tokens(
     assignments = []
 
     for name in owner_names:
-        # Step 1: Find the latest partial token globally that matches the category and is NOT completed
+        # Step 1: Find the latest partial token globally that is NOT completed
         partial_token = (
             db.query(Token)
             .filter(
                 Token.status == "partial",
-                Token.qurbani_done == False,
-                Token.category_title == category_title
+                Token.qurbani_done == False
             )
             .order_by(Token.token_no.asc())
             .first()
