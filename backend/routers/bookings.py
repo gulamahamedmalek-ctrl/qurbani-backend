@@ -181,11 +181,18 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
                 affected_token_ids.add(entry.token_id)
                 db.delete(entry)
             
-            # Step 3: Recalculate filled_slots for each affected token
+            # Step 3: Recalculate filled_slots and repack serial_no for each affected token
             for token_id in affected_token_ids:
                 token = db.query(Token).filter(Token.id == token_id).first()
                 if token:
-                    actual_count = db.query(TokenEntry).filter(TokenEntry.token_id == token_id).count()
+                    # Fetch remaining entries for this token, ordered by their original serial_no or ID
+                    remaining_entries = db.query(TokenEntry).filter(TokenEntry.token_id == token_id).order_by(TokenEntry.id).all()
+                    
+                    # Repack their serial numbers to be perfectly sequential (1, 2, 3...)
+                    for index, r_entry in enumerate(remaining_entries):
+                        r_entry.serial_no = index + 1
+                    
+                    actual_count = len(remaining_entries)
                     token.filled_slots = actual_count
                     token.status = "full" if actual_count >= token.max_slots else "partial"
             
@@ -195,3 +202,40 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
             return success_response(f"Booking '{booking.receipt_no}' deleted and {len(orphaned_entries)} token entries cleaned up")
         except Exception as e:
             return error_response(f"Failed to delete booking: {str(e)}")
+
+
+class BookingUpdate(BaseModel):
+    amount_per_hissah: float
+    purpose: str
+    representative_name: str
+    total_amount: float
+    address: str
+    mobile: str
+    reference: str
+    custom_fields_data: dict
+
+@router.put("/{booking_id}/")
+def edit_booking(booking_id: int, payload: BookingUpdate, db: Session = Depends(get_db)):
+    """Edit core details of a booking (except hissah count and owner names)."""
+    try:
+        booking = get_or_404(db, Booking, booking_id, "Booking")
+        
+        booking.amount_per_hissah = payload.amount_per_hissah
+        booking.purpose = payload.purpose
+        booking.representative_name = payload.representative_name
+        booking.total_amount = payload.total_amount
+        booking.address = payload.address
+        booking.mobile = payload.mobile
+        booking.reference = payload.reference
+        booking.custom_fields_data = json.dumps(payload.custom_fields_data)
+        
+        # Sync the purpose to all associated token entries
+        from models import TokenEntry
+        entries = db.query(TokenEntry).filter(TokenEntry.booking_id == booking_id).all()
+        for e in entries:
+            e.purpose = payload.purpose
+            
+        safe_commit(db, "Failed to update booking")
+        return success_response("Booking updated successfully")
+    except Exception as e:
+        return error_response(f"Failed to edit booking: {str(e)}")
