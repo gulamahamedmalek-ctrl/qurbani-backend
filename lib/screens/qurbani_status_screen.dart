@@ -524,7 +524,20 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                   final category = e == null ? '' : (e['booking_category'] ?? '');
                   final receipt = e == null ? '' : (e['receipt_no'] ?? '');
                   
-                  return ListTile(
+                  // Detect if this is a new booking boundary
+                  bool isNewReceipt = false;
+                  if (e != null) {
+                    if (index == 0) {
+                      isNewReceipt = true;
+                    } else {
+                      final prev = entries[index - 1];
+                      if (prev['receipt_no'] != receipt) {
+                        isNewReceipt = true;
+                      }
+                    }
+                  }
+
+                  Widget tile = ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                     leading: CircleAvatar(
                       backgroundColor: _brand.withOpacity(0.1),
@@ -549,6 +562,28 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                           ],
                         ),
                   );
+
+                  if (isNewReceipt) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (index > 0) const Divider(height: 16, color: Colors.black12),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8, top: 4, bottom: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.receipt_long, size: 14, color: _brand),
+                              const SizedBox(width: 6),
+                              Text('Receipt $receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _brand)),
+                            ],
+                          ),
+                        ),
+                        tile,
+                      ],
+                    );
+                  }
+
+                  return tile;
                 }),
                 if (!isDone)
                   Padding(
