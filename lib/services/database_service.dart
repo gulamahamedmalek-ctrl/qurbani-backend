@@ -295,4 +295,15 @@ class DatabaseService {
       return {'success': false, 'message': 'Failed to edit name: $e'};
     }
   }
+
+  static Future<Map<String, dynamic>> moveTokenEntry(int entryId, int newTokenId) async {
+    try {
+      final result = await _put('/tokens/entries/$entryId/move', {
+        'new_token_id': newTokenId,
+      });
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to move entry: $e'};
+    }
+  }
 }

@@ -482,6 +482,61 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     );
   }
 
+  Future<void> _moveEntry(Map<String, dynamic> entry) async {
+    final availableTokens = _allTokens.where((t) => 
+      t['id'] != entry['token_id'] && 
+      t['qurbani_done'] == false &&
+      t['filled_slots'] < t['max_slots']
+    ).toList();
+
+    if (availableTokens.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No available tokens to move to.')));
+      return;
+    }
+
+    int? selectedTokenId;
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Move to Token', style: TextStyle(fontWeight: FontWeight.bold, color: _brand)),
+            content: DropdownButtonFormField<int>(
+              decoration: const InputDecoration(labelText: 'Select Destination Token'),
+              value: selectedTokenId,
+              items: availableTokens.map((t) => DropdownMenuItem<int>(
+                value: t['id'],
+                child: Text('Token #${t['token_no']} (${t['category_title']}) - ${t['max_slots'] - t['filled_slots']} free'),
+              )).toList(),
+              onChanged: (val) => setState(() => selectedTokenId = val),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
+                onPressed: (isSaving || selectedTokenId == null) ? null : () async {
+                  setState(() => isSaving = true);
+                  final res = await DatabaseService.moveTokenEntry(entry['id'], selectedTokenId!);
+                  setState(() => isSaving = false);
+                  if (res['success'] == true) {
+                    Navigator.pop(ctx);
+                    _loadTokens(); // Refresh
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: _brand));
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${res['message']}'), backgroundColor: Colors.red));
+                  }
+                },
+                child: isSaving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Move'),
+              )
+            ],
+          );
+        }
+      ),
+    );
+  }
+
   Widget _buildExpandableTokenRow(Map<String, dynamic> token) {
     final bool isDone = token['qurbani_done'] == true;
     final int id = token['id'];
@@ -558,10 +613,18 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                           children: [
                             Text(e['purpose'] ?? '', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                             IconButton(
+                              icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.blue),
+                              onPressed: () => _moveEntry(e),
+                              padding: const EdgeInsets.only(left: 8),
+                              constraints: const BoxConstraints(),
+                              tooltip: 'Move to another token',
+                            ),
+                            IconButton(
                               icon: const Icon(Icons.edit, size: 18, color: _brand),
                               onPressed: () => _editEntryName(e),
                               padding: const EdgeInsets.only(left: 8),
                               constraints: const BoxConstraints(),
+                              tooltip: 'Edit name',
                             ),
                           ],
                         ),
