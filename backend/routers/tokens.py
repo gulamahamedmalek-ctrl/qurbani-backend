@@ -357,6 +357,10 @@ def swap_entries(req: SwapRequest, db: Session = Depends(get_db)):
             
             if token1.qurbani_done or token2.qurbani_done:
                 return error_response("Cannot swap because one of the tokens is already marked as DONE.")
+            
+            # Bug #6 fix: Prevent swapping within the same token (meaningless)
+            if entry1.token_id == entry2.token_id:
+                return error_response("Both entries are already in the same token.")
                 
             # Perform the swap!
             temp_token_id = entry1.token_id
@@ -411,7 +415,19 @@ def bulk_move_entries(req: BulkMoveRequest, db: Session = Depends(get_db)):
                     return error_response(f"Target token does not have enough free space for {len(entries)} people.")
             else:
                 # Create a brand new token!
-                # We assume the category of the first entry being moved
+                # Bug #5 fix: Validate all entries are from the same category
+                source_categories = set()
+                for ent in entries:
+                    src_token = db.query(Token).filter(Token.id == ent.token_id).first()
+                    if src_token:
+                        source_categories.add(src_token.category_title)
+                
+                if len(source_categories) > 1:
+                    return error_response(
+                        f"Cannot extract mixed categories ({', '.join(source_categories)}) into one token. "
+                        f"Please select people from the same category only."
+                    )
+                
                 sample_entry = entries[0]
                 sample_token = db.query(Token).filter(Token.id == sample_entry.token_id).first()
                 cat_title = sample_token.category_title if sample_token else "Large Animal"

@@ -176,6 +176,15 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
             # Step 1: Find all token entries linked to this booking
             orphaned_entries = db.query(TokenEntry).filter(TokenEntry.booking_id == booking_id).all()
             
+            # Bug #7 fix: Block deletion if any linked token is already marked DONE
+            for entry in orphaned_entries:
+                linked_token = db.query(Token).filter(Token.id == entry.token_id).first()
+                if linked_token and linked_token.qurbani_done:
+                    return error_response(
+                        f"Cannot delete — '{entry.owner_name}' is in Token #{linked_token.token_no} which is already marked as DONE. "
+                        f"Undo the Done status first if you need to delete this booking."
+                    )
+            
             # Step 2: Track which tokens are affected so we can recalculate
             affected_token_ids = set()
             for entry in orphaned_entries:

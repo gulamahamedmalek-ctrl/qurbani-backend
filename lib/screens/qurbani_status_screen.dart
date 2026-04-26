@@ -61,8 +61,16 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
       _categories = cats;
       _settings = settings;
       _isLoading = false;
-      // Preserve selection if possible
+      // Preserve selection if possible, prune stale references
       _selectedTokenIds.retainWhere((id) => tokens.any((t) => t['id'] == id));
+      // Bug #3 fix: prune entry selections that no longer exist after refresh
+      final allEntryIds = <int>{};
+      for (var t in tokens) {
+        for (var e in List<Map<String, dynamic>>.from(t['entries'] ?? [])) {
+          if (e['id'] != null) allEntryIds.add(e['id']);
+        }
+      }
+      _selectedEntryIds.retainWhere((id) => allEntryIds.contains(id));
     });
     _applyFilters();
   }
@@ -1178,7 +1186,7 @@ class _MoveEntrySheetState extends State<_MoveEntrySheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: DefaultTabController(
-        length: 2,
+        length: isGroup ? 1 : 2,
         child: Column(
           children: [
             Container(
