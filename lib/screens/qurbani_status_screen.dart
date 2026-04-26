@@ -273,7 +273,13 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                   final entriesToMove = <Map<String, dynamic>>[];
                   for (var t in _allTokens) {
                     final ents = List<Map<String, dynamic>>.from(t['entries'] ?? []);
-                    entriesToMove.addAll(ents.where((e) => _selectedEntryIds.contains(e['id'])));
+                    for (var e in ents) {
+                      if (_selectedEntryIds.contains(e['id'])) {
+                        // Manually inject token_id to guarantee it exists even if backend schema is outdated
+                        e['token_id'] = t['id'];
+                        entriesToMove.add(e);
+                      }
+                    }
                   }
                   if (entriesToMove.isNotEmpty) {
                     showModalBottomSheet(
@@ -574,6 +580,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                   // Detect if this is a new booking boundary
                   bool isNewReceipt = false;
                   if (e != null) {
+                    e['token_id'] = id; // Safety fallback injection
                     if (index == 0) {
                       isNewReceipt = true;
                     } else {
