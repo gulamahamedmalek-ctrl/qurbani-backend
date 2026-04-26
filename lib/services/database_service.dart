@@ -306,4 +306,28 @@ class DatabaseService {
       return {'success': false, 'message': 'Failed to move entry: $e'};
     }
   }
+
+  static Future<Map<String, dynamic>> swapTokenEntries(int entry1Id, int entry2Id) async {
+    try {
+      final result = await _post('/tokens/swap', {
+        'entry1_id': entry1Id,
+        'entry2_id': entry2Id,
+      });
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to swap: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> bulkMoveEntries(List<int> entryIds, int? targetTokenId) async {
+    try {
+      final result = await _post('/tokens/move_bulk', {
+        'entry_ids': entryIds,
+        'target_token_id': targetTokenId,
+      });
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to bulk move: $e'};
+    }
+  }
 }

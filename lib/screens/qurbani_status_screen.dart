@@ -3,6 +3,7 @@ import '../services/database_service.dart';
 import '../models/form_settings.dart';
 import '../services/receipt_generator.dart';
 import 'customer_details_screen.dart';
+import 'token_reassignment_screen.dart';
 import 'dart:convert';
 
 class QurbaniStatusScreen extends StatefulWidget {
@@ -252,9 +253,18 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF3F4F6),
         appBar: AppBar(
-          title: const Text('Advanced Execution Engine'),
+          title: const Text('Advanced Execution Engine', style: TextStyle(fontSize: 18)),
           backgroundColor: _brand,
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.dashboard_customize_outlined),
+              tooltip: 'Visual Shuffling Board',
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (ctx) => const TokenReassignmentScreen())).then((_) => _loadTokens());
+              },
+            ),
+          ],
           bottom: TabBar(
             indicatorColor: Colors.white,
             indicatorWeight: 3,
@@ -482,60 +492,8 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     );
   }
 
-  Future<void> _moveEntry(Map<String, dynamic> entry) async {
-    final availableTokens = _allTokens.where((t) => 
-      t['id'] != entry['token_id'] && 
-      t['qurbani_done'] == false &&
-      t['filled_slots'] < t['max_slots']
-    ).toList();
-
-    if (availableTokens.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No available tokens to move to.')));
-      return;
-    }
-
-    int? selectedTokenId;
-    bool isSaving = false;
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Move to Token', style: TextStyle(fontWeight: FontWeight.bold, color: _brand)),
-            content: DropdownButtonFormField<int>(
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Select Destination Token'),
-              value: selectedTokenId,
-              items: availableTokens.map((t) => DropdownMenuItem<int>(
-                value: t['id'],
-                child: Text('Token #${t['token_no']} (${t['category_title']}) - ${t['max_slots'] - t['filled_slots']} free'),
-              )).toList(),
-              onChanged: (val) => setState(() => selectedTokenId = val),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
-                onPressed: (isSaving || selectedTokenId == null) ? null : () async {
-                  setState(() => isSaving = true);
-                  final res = await DatabaseService.moveTokenEntry(entry['id'], selectedTokenId!);
-                  setState(() => isSaving = false);
-                  if (res['success'] == true) {
-                    Navigator.pop(ctx);
-                    _loadTokens(); // Refresh
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: _brand));
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${res['message']}'), backgroundColor: Colors.red));
-                  }
-                },
-                child: isSaving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Move'),
-              )
-            ],
-          );
-        }
-      ),
-    );
+  void _moveEntry(Map<String, dynamic> entry) {
+    Navigator.push(context, MaterialPageRoute(builder: (ctx) => const TokenReassignmentScreen())).then((_) => _loadTokens());
   }
 
   Widget _buildExpandableTokenRow(Map<String, dynamic> token) {
