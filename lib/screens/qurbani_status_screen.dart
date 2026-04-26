@@ -428,8 +428,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
               value: currentValue,
               items: options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
               onChanged: onChanged,
-              icon: const Icon(Icons.arrow_drop_down, color: _brand),
-              isExpanded: true,
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
             ),
           ),
         ),
@@ -484,9 +483,12 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
     final bool isDone = token['qurbani_done'] == true;
     final int id = token['id'];
     final bool isSelected = _selectedTokenIds.contains(id);
-    final entries = List<Map<String, dynamic>>.from(token['entries'] ?? []);
     final int max = token['max_slots'] ?? 7;
     final int tokenNo = token['token_no'];
+    List<dynamic> entries = List.from(token['entries'] ?? []);
+    
+    // Sort entries by serial_no to guarantee correct order on the frontend
+    entries.sort((a, b) => (a['serial_no'] ?? 0).compareTo(b['serial_no'] ?? 0));
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
