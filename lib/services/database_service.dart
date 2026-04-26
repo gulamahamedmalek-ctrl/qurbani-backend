@@ -231,6 +231,24 @@ class DatabaseService {
     }
   }
 
+  static Future<Map<String, dynamic>> editBooking(int bookingId, Map<String, dynamic> payload) async {
+    try {
+      final result = await _put('/bookings/$bookingId/', payload);
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to edit booking: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteBooking(int bookingId) async {
+    try {
+      final result = await _delete('/bookings/$bookingId/');
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to delete booking: $e'};
+    }
+  }
+
   // ═══════════════════════════════════════════════════════
   // TOKENS
   // ═══════════════════════════════════════════════════════

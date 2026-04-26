@@ -619,6 +619,90 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
     }
   }
 
+  Future<void> _cancelBooking() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Booking', style: TextStyle(color: Colors.red)),
+        content: const Text('Are you sure you want to cancel and delete this booking?\n\nThis will free up the associated Token slots for other customers. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Go Back')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete Booking'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    
+    setState(() => _isLoading = true);
+    final res = await DatabaseService.deleteBooking(widget.bookingId);
+    if (res['success'] == true) {
+      if (mounted) Navigator.pop(context); // Close sheet
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Cancelled successfully'), backgroundColor: _brand));
+    } else {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${res['message']}'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _editBookingDetails() async {
+    final mobileCtrl = TextEditingController(text: _booking!['mobile']);
+    final amountCtrl = TextEditingController(text: _booking!['amount_per_hissah']?.toString());
+    final addressCtrl = TextEditingController(text: _booking!['address']);
+    
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Booking Details', style: TextStyle(color: _brand)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: mobileCtrl, decoration: const InputDecoration(labelText: 'Mobile Number')),
+              TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address')),
+              TextField(controller: amountCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Amount per Hissah')),
+              const SizedBox(height: 16),
+              const Text('Note: To change names, edit them directly from the Live Tracking Board.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
+            onPressed: () async {
+              final payload = {
+                'mobile': mobileCtrl.text,
+                'address': addressCtrl.text,
+                'amount_per_hissah': double.tryParse(amountCtrl.text) ?? 0,
+                'purpose': _booking!['purpose'],
+                'representative_name': _booking!['representative_name'],
+                'total_amount': (double.tryParse(amountCtrl.text) ?? 0) * (_booking!['hissah_count'] ?? 1),
+                'reference': _booking!['reference'],
+                'custom_fields_data': _booking!['custom_fields_data'],
+              };
+              final res = await DatabaseService.editBooking(widget.bookingId, payload);
+              if (res['success'] == true) {
+                Navigator.pop(ctx, true);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${res['message']}'), backgroundColor: Colors.red));
+              }
+            },
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      _loadDetails();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -746,6 +830,36 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                 elevation: 0,
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _editBookingDetails,
+                  icon: const Icon(Icons.edit, color: _brand),
+                  label: const Text('EDIT', style: TextStyle(color: _brand, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: _brand),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _cancelBooking,
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  label: const Text('CANCEL BOOKING', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 40),
         ],
