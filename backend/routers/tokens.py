@@ -119,6 +119,20 @@ def list_tokens(category: str = None, db: Session = Depends(get_db)):
         if category:
             query = query.filter(Token.category_title == category)
         tokens = query.all()
+        
+        # SELF-HEALING: Fix any corrupted ghost counts left over from previous bugs
+        needs_commit = False
+        for t in tokens:
+            actual_count = len(t.entries)
+            if t.filled_slots != actual_count:
+                t.filled_slots = actual_count
+                t.status = "full" if actual_count >= t.max_slots else "partial"
+                needs_commit = True
+                
+        if needs_commit:
+            from utils import safe_commit
+            safe_commit(db, "Auto-healing token counts")
+            
         data = [TokenResponse.model_validate(t).model_dump() for t in tokens]
         return success_response("Tokens fetched", data)
     except Exception as e:
