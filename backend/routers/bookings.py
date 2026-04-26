@@ -4,6 +4,7 @@ Auto-generates sequential receipt numbers.
 """
 import json
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
