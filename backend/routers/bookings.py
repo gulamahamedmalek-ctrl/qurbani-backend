@@ -180,6 +180,8 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
             for entry in orphaned_entries:
                 affected_token_ids.add(entry.token_id)
                 db.delete(entry)
+                
+            db.flush() # CRITICAL: Flush deletions so subsequent queries don't see ghosts
             
             # Step 3: Recalculate filled_slots and repack serial_no for each affected token
             for token_id in affected_token_ids:
