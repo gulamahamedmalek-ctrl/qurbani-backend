@@ -428,11 +428,55 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
               value: currentValue,
               items: options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
               onChanged: onChanged,
-              style: const TextStyle(fontSize: 13, color: Colors.black87),
+              icon: const Icon(Icons.arrow_drop_down, color: _brand),
+              isExpanded: true,
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _editEntryName(Map<String, dynamic> entry) async {
+    final TextEditingController nameController = TextEditingController(text: entry['owner_name']);
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Edit Name', style: TextStyle(fontWeight: FontWeight.bold, color: _brand)),
+            content: TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Owner Name',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: _brand, width: 2)),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
+                onPressed: isSaving ? null : () async {
+                  if (nameController.text.trim().isEmpty) return;
+                  setState(() => isSaving = true);
+                  final res = await DatabaseService.editTokenEntryName(entry['id'], nameController.text.trim());
+                  setState(() => isSaving = false);
+                  if (res['success'] == true) {
+                    Navigator.pop(ctx);
+                    _loadTokens(); // Refresh list to show new name
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${res['message']}'), backgroundColor: Colors.red));
+                  }
+                },
+                child: isSaving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Save'),
+              )
+            ],
+          );
+        }
+      ),
     );
   }
 
@@ -488,7 +532,20 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                     title: Text(ownerName, style: TextStyle(color: e == null ? Colors.grey : Colors.black87, fontWeight: FontWeight.w600)),
                     subtitle: e != null && category.isNotEmpty ? Text('$category • $receipt', style: const TextStyle(fontSize: 12)) : null,
                     onTap: e == null ? null : () => _showBookingDetails(e['booking_id']),
-                    trailing: Text(e == null ? '' : (e['purpose'] ?? ''), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    trailing: e == null 
+                      ? null 
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(e['purpose'] ?? '', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 18, color: _brand),
+                              onPressed: () => _editEntryName(e),
+                              padding: const EdgeInsets.only(left: 8),
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
                   );
                 }),
                 if (!isDone)

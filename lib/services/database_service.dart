@@ -267,4 +267,14 @@ class DatabaseService {
       return {'success': false, 'message': 'Failed to process bulk update: $e'};
     }
   }
+  static Future<Map<String, dynamic>> editTokenEntryName(int entryId, String newName) async {
+    try {
+      final result = await _put('/tokens/entries/$entryId', {
+        'new_name': newName,
+      });
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to edit name: $e'};
+    }
+  }
 }
