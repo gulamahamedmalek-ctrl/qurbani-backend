@@ -32,6 +32,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
 
   // Batch Selection
   Set<int> _selectedTokenIds = {};
+  Set<int> _selectedEntryIds = {};
   bool _isMarkingBulk = false;
 
   final List<String> _sortOptions = [
@@ -179,7 +180,10 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
   }
 
   void _clearSelection() {
-    setState(() => _selectedTokenIds.clear());
+    setState(() {
+      _selectedTokenIds.clear();
+      _selectedEntryIds.clear();
+    });
   }
 
   Future<void> _markSelectedAsDone() async {
@@ -252,9 +256,39 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF3F4F6),
         appBar: AppBar(
-          title: const Text('Advanced Execution Engine', style: TextStyle(fontSize: 18)),
-          backgroundColor: _brand,
+          title: _selectedEntryIds.isNotEmpty
+              ? Text('${_selectedEntryIds.length} Selected', style: const TextStyle(fontSize: 18))
+              : const Text('Advanced Execution Engine', style: TextStyle(fontSize: 18)),
+          backgroundColor: _selectedEntryIds.isNotEmpty ? Colors.blue.shade800 : _brand,
           elevation: 0,
+          leading: _selectedEntryIds.isNotEmpty
+              ? IconButton(icon: const Icon(Icons.close), onPressed: _clearSelection)
+              : null,
+          actions: [
+            if (_selectedEntryIds.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.move_up),
+                tooltip: 'Move Selected',
+                onPressed: () {
+                  final entriesToMove = <Map<String, dynamic>>[];
+                  for (var t in _allTokens) {
+                    final ents = List<Map<String, dynamic>>.from(t['entries'] ?? []);
+                    entriesToMove.addAll(ents.where((e) => _selectedEntryIds.contains(e['id'])));
+                  }
+                  if (entriesToMove.isNotEmpty) {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => _MoveEntrySheet(entries: entriesToMove, allTokens: _allTokens, onRefresh: () {
+                        _clearSelection();
+                        _loadTokens();
+                      }),
+                    );
+                  }
+                },
+              ),
+          ],
           bottom: TabBar(
             indicatorColor: Colors.white,
             indicatorWeight: 3,
@@ -487,7 +521,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _MoveEntrySheet(entry: entry, allTokens: _allTokens, onRefresh: _loadTokens),
+      builder: (ctx) => _MoveEntrySheet(entries: [entry], allTokens: _allTokens, onRefresh: _loadTokens),
     );
   }
 
@@ -552,10 +586,25 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
 
                   Widget tile = ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                    leading: CircleAvatar(
-                      backgroundColor: _brand.withOpacity(0.1),
-                      radius: 16,
-                      child: Text('$tokenNo.${index + 1}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)),
+                    leading: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (e != null && !isDone)
+                          Checkbox(
+                            value: _selectedEntryIds.contains(e['id']),
+                            onChanged: (v) {
+                              setState(() {
+                                if (v == true) _selectedEntryIds.add(e['id']);
+                                else _selectedEntryIds.remove(e['id']);
+                              });
+                            },
+                          ),
+                        CircleAvatar(
+                          backgroundColor: _brand.withOpacity(0.1),
+                          radius: 16,
+                          child: Text('$tokenNo.${index + 1}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
                     title: Text(ownerName, style: TextStyle(color: e == null ? Colors.grey : Colors.black87, fontWeight: FontWeight.w600)),
                     subtitle: e != null && category.isNotEmpty ? Text('$category • $receipt${(e['purpose'] != null && e['purpose'].toString().isNotEmpty) ? ' • ${e['purpose']}' : ''}', style: const TextStyle(fontSize: 12)) : null,
@@ -1042,3 +1091,188 @@ class _HistoryTabState extends State<_HistoryTab> {
     );
   }
 }
+
+class _MoveEntrySheet extends StatefulWidget {
+  final List<Map<String, dynamic>> entries;
+  final List<Map<String, dynamic>> allTokens;
+  final VoidCallback onRefresh;
+
+  const _MoveEntrySheet({required this.entries, required this.allTokens, required this.onRefresh});
+
+  @override
+  State<_MoveEntrySheet> createState() => _MoveEntrySheetState();
+}
+
+class _MoveEntrySheetState extends State<_MoveEntrySheet> {
+  static const Color _brand = Color(0xFF0D5C46);
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isGroup = widget.entries.length > 1;
+    final int requiredSlots = widget.entries.length;
+    final List<int> sourceTokenIds = widget.entries.map((e) => e['token_id'] as int).toSet().toList();
+
+    // 1. Available Tokens with ENOUGH free space
+    final availableTokens = widget.allTokens.where((t) => 
+      !sourceTokenIds.contains(t['id']) && 
+      t['qurbani_done'] == false &&
+      (t['max_slots'] - t['filled_slots']) >= requiredSlots
+    ).toList();
+
+    // 2. All other people to SWAP with (only relevant if isGroup == false)
+    final List<Map<String, dynamic>> allOtherPeople = [];
+    if (!isGroup) {
+      for (var t in widget.allTokens) {
+        if (t['qurbani_done'] == true) continue;
+        final ents = List<dynamic>.from(t['entries'] ?? []);
+        for (var e in ents) {
+          if (e['id'] != widget.entries.first['id']) {
+            allOtherPeople.add({
+              ...e,
+              'token_no': t['token_no'],
+              'category_title': t['category_title'],
+            });
+          }
+        }
+      }
+    }
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: const BorderRadius.vertical(top: Radius.circular(20))),
+              child: Row(
+                children: [
+                  CircleAvatar(backgroundColor: _brand.withOpacity(0.1), child: const Icon(Icons.person, color: _brand)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Reassigning', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(isGroup ? '${widget.entries.length} People Selected' : widget.entries.first['owner_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      ],
+                    ),
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
+            ),
+            TabBar(
+              labelColor: _brand,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: _brand,
+              tabs: [
+                const Tab(text: 'Move to Slot'),
+                if (!isGroup) const Tab(text: 'Swap Person'),
+              ],
+            ),
+            Expanded(
+              child: _isSaving 
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                  children: [
+                    // MOVE TAB
+                    ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)),
+                          onPressed: () async {
+                            setState(() => _isSaving = true);
+                            final ids = widget.entries.map((e) => e['id'] as int).toList();
+                            final res = await DatabaseService.bulkMoveEntries(ids, null);
+                            if (res['success'] == true) {
+                              Navigator.pop(context);
+                              widget.onRefresh();
+                            } else {
+                              setState(() => _isSaving = false);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
+                            }
+                          },
+                          icon: const Icon(Icons.add_circle_outline),
+                          label: const Text('Extract into a Brand New Token', style: TextStyle(fontSize: 16)),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Text('OR MOVE TO EXISTING TOKEN:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
+                        ),
+                        if (availableTokens.isEmpty)
+                          Center(child: Text('No other tokens have $requiredSlots empty slot(s).', style: const TextStyle(color: Colors.grey))),
+                        ...availableTokens.map((t) => Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(backgroundColor: Colors.blue.shade50, child: Text('${t['token_no']}', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold))),
+                            title: Text('Token #${t['token_no']} (${t['category_title']})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('${t['max_slots'] - t['filled_slots']} slots free'),
+                            trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                            onTap: () async {
+                              setState(() => _isSaving = true);
+                              final ids = widget.entries.map((e) => e['id'] as int).toList();
+                              final res = await DatabaseService.bulkMoveEntries(ids, t['id']);
+                              if (res['success'] == true) {
+                                Navigator.pop(context);
+                                widget.onRefresh();
+                              } else {
+                                setState(() => _isSaving = false);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
+                              }
+                            },
+                          ),
+                        )),
+                      ],
+                    ),
+                    
+                    // SWAP TAB
+                    if (!isGroup)
+                      ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 16),
+                            child: Text('Select someone to instantly swap places with:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
+                          ),
+                          if (allOtherPeople.isEmpty)
+                            const Center(child: Text('No one else to swap with.', style: TextStyle(color: Colors.grey))),
+                          ...allOtherPeople.map((p) => Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: CircleAvatar(backgroundColor: Colors.orange.shade50, child: const Icon(Icons.swap_calls, color: Colors.orange)),
+                              title: Text(p['owner_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('Currently in Token #${p['token_no']}'),
+                              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                              onTap: () async {
+                                setState(() => _isSaving = true);
+                                final res = await DatabaseService.swapTokenEntries(widget.entries.first['id'], p['id']);
+                              if (res['success'] == true) {
+                                Navigator.pop(context);
+                                widget.onRefresh();
+                              } else {
+                                setState(() => _isSaving = false);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message']), backgroundColor: Colors.red));
+                              }
+                            },
+                          ),
+                        )),
+                      ],
+                    ),
+                  ],
+                ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
