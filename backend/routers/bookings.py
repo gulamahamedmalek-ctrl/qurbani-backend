@@ -211,9 +211,12 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
 
 
 class BookingUpdate(BaseModel):
+    category_title: str
     amount_per_hissah: float
     purpose: str
     representative_name: str
+    owner_names: list[str]
+    hissah_count: int
     total_amount: float
     address: str
     mobile: str
@@ -222,26 +225,76 @@ class BookingUpdate(BaseModel):
 
 @router.put("/{booking_id}/")
 def edit_booking(booking_id: int, payload: BookingUpdate, db: Session = Depends(get_db)):
-    """Edit core details of a booking (except hissah count and owner names)."""
-    try:
-        booking = get_or_404(db, Booking, booking_id, "Booking")
-        
-        booking.amount_per_hissah = payload.amount_per_hissah
-        booking.purpose = payload.purpose
-        booking.representative_name = payload.representative_name
-        booking.total_amount = payload.total_amount
-        booking.address = payload.address
-        booking.mobile = payload.mobile
-        booking.reference = payload.reference
-        booking.custom_fields_data = json.dumps(payload.custom_fields_data)
-        
-        # Sync the purpose to all associated token entries
-        from models import TokenEntry
-        entries = db.query(TokenEntry).filter(TokenEntry.booking_id == booking_id).all()
-        for e in entries:
-            e.purpose = payload.purpose
+    """Edit all details of a booking, intelligently handling token re-assignments if needed."""
+    from database import booking_lock
+    from models import TokenEntry, Token
+    from routers.tokens import assign_names_to_tokens
+    
+    with booking_lock:
+        try:
+            booking = get_or_404(db, Booking, booking_id, "Booking")
             
-        safe_commit(db, "Failed to update booking")
-        return success_response("Booking updated successfully")
-    except Exception as e:
-        return error_response(f"Failed to edit booking: {str(e)}")
+            # Check if category or count changed, requiring a full token re-assignment
+            requires_reassignment = (
+                booking.category_title != payload.category_title or
+                booking.hissah_count != payload.hissah_count
+            )
+            
+            # 1. Update Core Booking Data
+            booking.category_title = payload.category_title
+            booking.amount_per_hissah = payload.amount_per_hissah
+            booking.purpose = payload.purpose
+            booking.representative_name = payload.representative_name
+            booking.owner_names = json.dumps(payload.owner_names)
+            booking.hissah_count = payload.hissah_count
+            booking.total_amount = payload.total_amount
+            booking.address = payload.address
+            booking.mobile = payload.mobile
+            booking.reference = payload.reference
+            booking.custom_fields_data = json.dumps(payload.custom_fields_data)
+            
+            if requires_reassignment:
+                # 2A. Full Re-assignment: Delete old entries, repack tokens, generate new assignments
+                old_entries = db.query(TokenEntry).filter(TokenEntry.booking_id == booking_id).all()
+                affected_tokens = set()
+                
+                for entry in old_entries:
+                    affected_tokens.add(entry.token_id)
+                    db.delete(entry)
+                db.flush()
+                
+                # Repack affected tokens
+                for t_id in affected_tokens:
+                    token = db.query(Token).filter(Token.id == t_id).first()
+                    if token:
+                        remaining = db.query(TokenEntry).filter(TokenEntry.token_id == t_id).order_by(TokenEntry.id).all()
+                        for idx, r_entry in enumerate(remaining):
+                            r_entry.serial_no = idx + 1
+                        actual = len(remaining)
+                        if actual == 0:
+                            db.delete(token)
+                        else:
+                            token.filled_slots = actual
+                            token.status = "full" if actual >= token.max_slots else "partial"
+                db.flush()
+                
+                # Assign new tokens
+                assign_names_to_tokens(
+                    db=db,
+                    category_title=payload.category_title,
+                    owner_names=payload.owner_names,
+                    booking_id=booking.id,
+                    purpose=payload.purpose,
+                )
+            else:
+                # 2B. In-place Update: Just update names & purpose (preserves their spot in queue)
+                entries = db.query(TokenEntry).filter(TokenEntry.booking_id == booking_id).order_by(TokenEntry.id).all()
+                for idx, entry in enumerate(entries):
+                    entry.purpose = payload.purpose
+                    if idx < len(payload.owner_names):
+                        entry.owner_name = payload.owner_names[idx]
+            
+            safe_commit(db, "Failed to update booking")
+            return success_response("Booking updated successfully")
+        except Exception as e:
+            return error_response(f"Failed to edit booking: {str(e)}")
