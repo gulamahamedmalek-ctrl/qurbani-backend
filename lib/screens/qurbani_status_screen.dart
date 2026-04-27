@@ -828,7 +828,7 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
   }
 
   Widget _buildContent() {
-    final date = DateTime.tryParse(_booking!['booking_date'] ?? '')?.toLocal();
+    final date = DateTime.tryParse(_booking!['created_at'] ?? '')?.toLocal();
     final dateStr = date != null ? '${date.day}/${date.month}/${date.year}' : 'N/A';
     
     Map<String, dynamic> customData = {};
@@ -1073,17 +1073,36 @@ class _HistoryTabState extends State<_HistoryTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Calculate summary stats
+    final totalBookings = _bookings.length;
+    double totalAmount = 0;
+    int totalHissah = 0;
+    for (var b in _bookings) {
+      totalAmount += (b['total_amount'] ?? 0).toDouble();
+      totalHissah += (b['hissah_count'] ?? 0) as int;
+    }
+
     return Column(
       children: [
+        // Search Bar
         Container(
           color: Colors.white,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: TextField(
             controller: _searchCtrl,
-            onChanged: (v) => _loadBookings(query: v),
+            onChanged: (v) => _loadBookings(query: v.isEmpty ? null : v),
             decoration: InputDecoration(
               hintText: 'Search by Name, Mobile or Receipt...',
               prefixIcon: const Icon(Icons.search, color: _brand),
+              suffixIcon: _searchCtrl.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        _loadBookings();
+                      },
+                    )
+                  : null,
               filled: true,
               fillColor: Colors.grey.shade100,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -1091,46 +1110,167 @@ class _HistoryTabState extends State<_HistoryTab> {
             ),
           ),
         ),
+
+        // Summary Stats Row
+        if (!_isLoading && _bookings.isNotEmpty)
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Row(
+              children: [
+                _buildStatChip(Icons.receipt_long, '$totalBookings', 'Bookings'),
+                const SizedBox(width: 8),
+                _buildStatChip(Icons.people, '$totalHissah', 'Hissahs'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildStatChip(Icons.account_balance_wallet, '${widget.settings.currencySymbol}${totalAmount.toStringAsFixed(0)}', 'Collected'),
+                ),
+              ],
+            ),
+          ),
+
+        // Booking List
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: _brand))
               : _bookings.isEmpty
-                  ? Center(child: Text('No history found.', style: TextStyle(color: Colors.grey.shade400)))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _bookings.length,
-                      itemBuilder: (ctx, i) {
-                        final b = _bookings[i];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade100),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            onTap: () async {
-                              await showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (ctx) => _BookingDetailSheet(bookingId: b['id'], settings: widget.settings),
-                              );
-                              // Refresh history when sheet closes
-                              _loadBookings();
-                            },
-                            leading: CircleAvatar(backgroundColor: _brand.withOpacity(0.1), child: const Icon(Icons.person, color: _brand)),
-                            title: Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Receipt: ${b['receipt_no']}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                            trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                          ),
-                        );
-                      },
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
+                          const SizedBox(height: 16),
+                          Text(_searchCtrl.text.isNotEmpty ? 'No results for "${_searchCtrl.text}"' : 'No bookings yet.', style: TextStyle(color: Colors.grey.shade400, fontSize: 16)),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      color: _brand,
+                      onRefresh: () => _loadBookings(query: _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _bookings.length,
+                        itemBuilder: (ctx, i) {
+                          final b = _bookings[i];
+                          final date = DateTime.tryParse(b['created_at'] ?? '')?.toLocal();
+                          final dateStr = date != null ? '${date.day}/${date.month}/${date.year}' : '';
+                          final hissah = b['hissah_count'] ?? 0;
+                          final amount = (b['total_amount'] ?? 0).toDouble();
+                          final category = b['category_title'] ?? '';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade100),
+                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () async {
+                                await showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (ctx) => _BookingDetailSheet(bookingId: b['id'], settings: widget.settings),
+                                );
+                                _loadBookings();
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    // Avatar with initials
+                                    CircleAvatar(
+                                      backgroundColor: _brand.withOpacity(0.1),
+                                      radius: 24,
+                                      child: Text(
+                                        (b['representative_name'] ?? 'N').toString().isNotEmpty
+                                            ? (b['representative_name'] ?? 'N').toString().substring(0, 1).toUpperCase()
+                                            : 'N',
+                                        style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 18),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    // Name, receipt, date
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.receipt, size: 13, color: Colors.grey.shade500),
+                                              const SizedBox(width: 4),
+                                              Text(b['receipt_no'] ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                              if (dateStr.isNotEmpty) ...[
+                                                Text('  •  ', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                                                Text(dateStr, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                                              ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Right side: amount + hissah count
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text('${widget.settings.currencySymbol}${amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _brand)),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: _brand.withOpacity(0.08),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text('$hissah Hissah', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.w600)),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStatChip(IconData icon, String value, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: _brand.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: _brand),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _brand), overflow: TextOverflow.ellipsis),
+                  Text(label, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
