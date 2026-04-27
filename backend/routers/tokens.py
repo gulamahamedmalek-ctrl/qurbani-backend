@@ -38,11 +38,13 @@ def assign_names_to_tokens(
     assignments = []
 
     for name in owner_names:
-        # Step 1: Find the latest partial token for THIS SPECIFIC CATEGORY that is NOT completed
+        # Step 1: Find the latest partial token with MATCHING CAPACITY that is NOT completed
+        # We match by max_slots (not category_title string) to avoid mismatches
+        # from case differences while still preventing cross-size contamination
         partial_token = (
             db.query(Token)
             .filter(
-                Token.category_title == category_title, # Bug #4 fix
+                Token.max_slots == max_slots,
                 Token.status == "partial",
                 Token.qurbani_done == False
             )
