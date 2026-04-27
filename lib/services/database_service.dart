@@ -188,6 +188,7 @@ class DatabaseService {
     required String mobile,
     required String reference,
     Map<String, dynamic> customFieldsData = const {},
+    bool separateToken = false,
   }) async {
     try {
       final result = await _post('/bookings/', {
@@ -202,6 +203,7 @@ class DatabaseService {
         'mobile': mobile,
         'reference': reference,
         'custom_fields_data': customFieldsData,
+        'separate_token': separateToken,
       });
       return result;
     } catch (e) {

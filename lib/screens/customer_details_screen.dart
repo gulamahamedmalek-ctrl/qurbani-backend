@@ -43,6 +43,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   // Dynamic owners list
   final List<TextEditingController> _ownerNameControllers = [];
   bool _isNiyatKeMutabik = false;
+  bool _separateToken = false;
 
   // Custom field controllers (keyed by field ID)
   final Map<String, TextEditingController> _customFieldControllers = {};
@@ -431,7 +432,30 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+
+              // Separate Token checkbox
+              if (widget.existingBooking == null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: _separateToken ? const Color(0xFF0D5C46).withOpacity(0.08) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _separateToken ? const Color(0xFF0D5C46) : Colors.grey.shade300),
+                  ),
+                  child: CheckboxListTile(
+                    value: _separateToken,
+                    onChanged: (val) => setState(() => _separateToken = val ?? false),
+                    activeColor: const Color(0xFF0D5C46),
+                    title: const Text('Keep Family Together', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    subtitle: const Text('Creates a dedicated token for this booking so all members stay in the same animal.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    secondary: Icon(_separateToken ? Icons.family_restroom : Icons.group, color: _separateToken ? const Color(0xFF0D5C46) : Colors.grey),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+
+              const SizedBox(height: 16),
 
               ElevatedButton(
                 onPressed: _isSubmitting ? null : () async {
@@ -502,6 +526,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                       mobile: _mobileController.text.trim(),
                       reference: _referenceController.text.trim(),
                       customFieldsData: customData,
+                      separateToken: _separateToken,
                     );
 
                     if (!mounted) return;

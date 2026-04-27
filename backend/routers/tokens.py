@@ -21,36 +21,47 @@ def assign_names_to_tokens(
     owner_names: list[str],
     booking_id: int,
     purpose: str = "Qurbani",
+    separate_token: bool = False,
 ) -> list[dict]:
     """
     THE MAIN ENGINE — assigns each name to a token slot.
     
     Rules (UPDATED FOR GLOBAL TOKENS):
-    1. Find the latest PARTIAL token (regardless of category)
+    1. Find the latest PARTIAL token with matching capacity
     2. Fill its remaining slots first
     3. If all slots are filled, create a NEW token
     4. Repeat until all names are assigned
+    
+    If separate_token=True, skip step 1 and always create a fresh token
+    so the family stays together.
     """
     # Get max slots from category, default to 7
     category = db.query(Category).filter(Category.title == category_title).first()
     max_slots = category.hissah_per_token if category else 7
 
     assignments = []
+    # When separate_token is True, we track the dedicated token we create
+    dedicated_token = None
 
     for name in owner_names:
-        # Step 1: Find the latest partial token with MATCHING CAPACITY that is NOT completed
-        # We match by max_slots (not category_title string) to avoid mismatches
-        # from case differences while still preventing cross-size contamination
-        partial_token = (
-            db.query(Token)
-            .filter(
-                Token.max_slots == max_slots,
-                Token.status == "partial",
-                Token.qurbani_done == False
+        partial_token = None
+        
+        if separate_token and dedicated_token is not None:
+            # Re-use the dedicated token we already created for this family
+            if dedicated_token.filled_slots < dedicated_token.max_slots:
+                partial_token = dedicated_token
+        elif not separate_token:
+            # Normal flow: find any existing partial token with matching capacity
+            partial_token = (
+                db.query(Token)
+                .filter(
+                    Token.max_slots == max_slots,
+                    Token.status == "partial",
+                    Token.qurbani_done == False
+                )
+                .order_by(Token.token_no.asc())
+                .first()
             )
-            .order_by(Token.token_no.asc())
-            .first()
-        )
 
         if partial_token:
             # Step 2: Fill the next slot in the existing partial token
@@ -93,6 +104,10 @@ def assign_names_to_tokens(
             )
             db.add(new_token)
             db.flush() # Ensure new_token.id is available for the entry
+            
+            # Track this as the dedicated token for the family
+            if separate_token:
+                dedicated_token = new_token
 
             entry = TokenEntry(
                 token_id=new_token.id,

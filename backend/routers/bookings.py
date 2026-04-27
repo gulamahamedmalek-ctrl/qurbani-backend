@@ -99,6 +99,7 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
                 owner_names=payload.owner_names,
                 booking_id=booking.id,
                 purpose=payload.purpose,
+                separate_token=payload.separate_token,
             )
 
             # ONE SINGLE COMMIT for everything (Booking + Token Entries)

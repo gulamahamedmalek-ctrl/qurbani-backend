@@ -83,6 +83,7 @@ class BookingCreate(BaseModel):
     mobile: str = ""
     reference: str = ""
     custom_fields_data: Dict[str, Any] = {}
+    separate_token: bool = False  # When True, creates a dedicated token for this family
 
 
 class BookingResponse(BaseModel):
