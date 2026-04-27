@@ -684,7 +684,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                             children: [
                               const Icon(Icons.receipt_long, size: 14, color: _brand),
                               const SizedBox(width: 6),
-                              Text(repName.isNotEmpty ? 'Receipt $receipt  •  $repName' : 'Receipt $receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _brand)),
+                              Expanded(child: Text(repName.isNotEmpty ? 'Receipt $receipt  •  $repName' : 'Receipt $receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _brand), overflow: TextOverflow.ellipsis)),
                             ],
                           ),
                         ),
