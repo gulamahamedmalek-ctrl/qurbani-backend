@@ -9,8 +9,8 @@ import '../models/form_settings.dart';
 /// Every screen imports this — change the base URL once, everything updates.
 class DatabaseService {
   // ── SERVER URL CONFIGURATION ──
-  // The app now connects to your LIVE backend on Render.com
-  static const String _liveBaseUrl = 'https://qurbani-api.onrender.com/api';
+  // The app now connects to your LIVE backend on Hugging Face Spaces
+  static const String _liveBaseUrl = 'https://ibrahimmalek608-qurbani-api.hf.space/api';
 
   static String get _baseUrl {
     if (kIsWeb) {
