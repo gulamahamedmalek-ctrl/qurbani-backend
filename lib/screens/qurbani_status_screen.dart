@@ -572,9 +572,11 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
         subtitle: Text('${token['filled_slots']}/$max Hissah - ${isDone ? "Done" : "Pending"}'),
         children: [
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(16),
             color: Colors.grey.shade50,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ...List.generate(max, (index) {
                   final e = index < entries.length ? entries[index] : null;
