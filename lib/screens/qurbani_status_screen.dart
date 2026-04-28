@@ -3,6 +3,7 @@ import '../services/database_service.dart';
 import '../models/form_settings.dart';
 import '../services/receipt_generator.dart';
 import '../services/report_generator.dart';
+import '../services/slaughter_list_generator.dart';
 import 'customer_details_screen.dart';
 import 'dart:convert';
 
@@ -1191,6 +1192,15 @@ class _HistoryTabState extends State<_HistoryTab> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF report...'), backgroundColor: _brand));
   }
 
+  void _exportSlaughterList() {
+    SlaughterListGenerator.generate(
+      organizationName: widget.settings.organizationName,
+      currencySymbol: widget.settings.currencySymbol,
+      category: _catFilter != 'All' ? _catFilter : null,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating Slaughter List...'), backgroundColor: _brand));
+  }
+
   @override
   Widget build(BuildContext context) {
     double totalAmount = 0;
@@ -1228,11 +1238,18 @@ class _HistoryTabState extends State<_HistoryTab> {
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton(
-                onPressed: _filtered.isNotEmpty ? _exportPdf : null,
+              PopupMenuButton<String>(
                 icon: const Icon(Icons.picture_as_pdf, color: _brand),
                 tooltip: 'Export PDF',
-                style: IconButton.styleFrom(backgroundColor: _brand.withOpacity(0.08)),
+                enabled: _filtered.isNotEmpty,
+                onSelected: (v) {
+                  if (v == 'report') _exportPdf();
+                  if (v == 'slaughter') _exportSlaughterList();
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'report', child: ListTile(leading: Icon(Icons.summarize, color: Color(0xFF0D5C46)), title: Text('Booking Report'), subtitle: Text('Summary, stats & breakdown', style: TextStyle(fontSize: 11)), dense: true, contentPadding: EdgeInsets.zero)),
+                  const PopupMenuItem(value: 'slaughter', child: ListTile(leading: Icon(Icons.format_list_numbered, color: Color(0xFF0D5C46)), title: Text('Slaughter List'), subtitle: Text('Token-wise owner names for sacrifice', style: TextStyle(fontSize: 11)), dense: true, contentPadding: EdgeInsets.zero)),
+                ],
               ),
             ],
           ),
