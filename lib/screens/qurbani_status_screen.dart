@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../models/form_settings.dart';
 import '../services/receipt_generator.dart';
+import '../services/report_generator.dart';
 import 'customer_details_screen.dart';
 import 'dart:convert';
 
@@ -1062,9 +1063,16 @@ class _HistoryTab extends StatefulWidget {
 
 class _HistoryTabState extends State<_HistoryTab> {
   static const Color _brand = Color(0xFF0D5C46);
-  List<Map<String, dynamic>> _bookings = [];
+  List<Map<String, dynamic>> _allBookings = [];
+  List<Map<String, dynamic>> _filtered = [];
   bool _isLoading = true;
   final TextEditingController _searchCtrl = TextEditingController();
+
+  // Filters
+  DateTimeRange? _dateRange;
+  String _catFilter = 'All';
+  String _refFilter = 'All';
+  bool _showRefBreakdown = false;
 
   @override
   void initState() {
@@ -1072,77 +1080,210 @@ class _HistoryTabState extends State<_HistoryTab> {
     _loadBookings();
   }
 
-  Future<void> _loadBookings({String? query}) async {
-    // 1. Try to load from CACHE first for instant feedback (only for default list)
-    if (query == null && _bookings.isEmpty) {
+  Future<void> _loadBookings() async {
+    if (_allBookings.isEmpty) {
       final cached = await DatabaseService.loadBookings(useCache: true);
       if (cached.isNotEmpty && mounted) {
-        setState(() {
-          _bookings = cached;
-          _isLoading = false;
-        });
+        setState(() { _allBookings = cached; _isLoading = false; });
+        _applyFilters();
       }
     }
-
-    // 2. Fetch fresh data from network
-    if (_bookings.isEmpty) setState(() => _isLoading = true);
-    final results = await DatabaseService.loadBookings(query: query);
+    if (_allBookings.isEmpty) setState(() => _isLoading = true);
+    final results = await DatabaseService.loadBookings();
     if (mounted) {
-      setState(() {
-        _bookings = results;
-        _isLoading = false;
-      });
+      setState(() { _allBookings = results; _isLoading = false; });
+      _applyFilters();
     }
+  }
+
+  void _applyFilters() {
+    List<Map<String, dynamic>> result = List.from(_allBookings);
+
+    // Search
+    final q = _searchCtrl.text.toLowerCase();
+    if (q.isNotEmpty) {
+      result = result.where((b) {
+        final name = (b['representative_name'] ?? '').toString().toLowerCase();
+        final mobile = (b['mobile'] ?? '').toString().toLowerCase();
+        final receipt = (b['receipt_no'] ?? '').toString().toLowerCase();
+        return name.contains(q) || mobile.contains(q) || receipt.contains(q);
+      }).toList();
+    }
+
+    // Date Range
+    if (_dateRange != null) {
+      result = result.where((b) {
+        final d = DateTime.tryParse(b['created_at'] ?? '');
+        if (d == null) return false;
+        return !d.isBefore(_dateRange!.start) && d.isBefore(_dateRange!.end.add(const Duration(days: 1)));
+      }).toList();
+    }
+
+    // Category
+    if (_catFilter != 'All') {
+      result = result.where((b) => b['category_title'] == _catFilter).toList();
+    }
+
+    // Reference
+    if (_refFilter != 'All') {
+      result = result.where((b) => (b['reference'] ?? '') == _refFilter).toList();
+    }
+
+    setState(() => _filtered = result);
+  }
+
+  List<String> get _categories {
+    final cats = _allBookings.map((b) => (b['category_title'] ?? '').toString()).toSet().toList();
+    cats.sort();
+    return ['All', ...cats];
+  }
+
+  List<String> get _references {
+    final refs = _allBookings.map((b) => (b['reference'] ?? '').toString()).where((r) => r.isNotEmpty).toSet().toList();
+    refs.sort();
+    return ['All', ...refs];
+  }
+
+  Map<String, _RefBreakdown> get _refBreakdownMap {
+    final map = <String, _RefBreakdown>{};
+    for (var b in _filtered) {
+      final ref = (b['reference'] ?? 'N/A').toString();
+      map.putIfAbsent(ref, () => _RefBreakdown());
+      map[ref]!.count++;
+      map[ref]!.hissahs += (b['hissah_count'] ?? 0) as int;
+      map[ref]!.amount += (b['total_amount'] ?? 0).toDouble();
+    }
+    return map;
+  }
+
+  String get _dateRangeStr {
+    if (_dateRange == null) return '';
+    final s = _dateRange!.start;
+    final e = _dateRange!.end;
+    return '${s.day}/${s.month}/${s.year} — ${e.day}/${e.month}/${e.year}';
+  }
+
+  Future<void> _pickDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDateRange: _dateRange,
+      builder: (ctx, child) => Theme(data: Theme.of(ctx).copyWith(colorScheme: Theme.of(ctx).colorScheme.copyWith(primary: _brand)), child: child!),
+    );
+    if (picked != null) {
+      _dateRange = picked;
+      _applyFilters();
+    }
+  }
+
+  void _exportPdf() {
+    final cur = widget.settings.currencySymbol;
+    ReportGenerator.generateReport(
+      bookings: _filtered,
+      title: 'Booking Report',
+      currencySymbol: cur,
+      organizationName: widget.settings.organizationName,
+      dateRange: _dateRangeStr.isNotEmpty ? _dateRangeStr : null,
+      categoryFilter: _catFilter,
+      referenceFilter: _refFilter,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF report...'), backgroundColor: _brand));
   }
 
   @override
   Widget build(BuildContext context) {
-    // Calculate summary stats
-    final totalBookings = _bookings.length;
     double totalAmount = 0;
     int totalHissah = 0;
-    for (var b in _bookings) {
+    for (var b in _filtered) {
       totalAmount += (b['total_amount'] ?? 0).toDouble();
       totalHissah += (b['hissah_count'] ?? 0) as int;
     }
 
+    final hasActiveFilter = _dateRange != null || _catFilter != 'All' || _refFilter != 'All';
+
     return Column(
       children: [
-        // Search Bar
+        // Search + Export Row
         Container(
           color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: TextField(
-            controller: _searchCtrl,
-            onChanged: (v) => _loadBookings(query: v.isEmpty ? null : v),
-            decoration: InputDecoration(
-              hintText: 'Search by Name, Mobile or Receipt...',
-              prefixIcon: const Icon(Icons.search, color: _brand),
-              suffixIcon: _searchCtrl.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        _loadBookings();
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: Colors.grey.shade100,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (_) => _applyFilters(),
+                  decoration: InputDecoration(
+                    hintText: 'Search Name, Mobile, Receipt...',
+                    prefixIcon: const Icon(Icons.search, color: _brand, size: 20),
+                    suffixIcon: _searchCtrl.text.isNotEmpty
+                        ? IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () { _searchCtrl.clear(); _applyFilters(); })
+                        : null,
+                    filled: true, fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _filtered.isNotEmpty ? _exportPdf : null,
+                icon: const Icon(Icons.picture_as_pdf, color: _brand),
+                tooltip: 'Export PDF',
+                style: IconButton.styleFrom(backgroundColor: _brand.withOpacity(0.08)),
+              ),
+            ],
+          ),
+        ),
+
+        // Filter Chips Row
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Date Range Chip
+                ActionChip(
+                  avatar: const Icon(Icons.calendar_today, size: 14, color: _brand),
+                  label: Text(_dateRange != null ? _dateRangeStr : 'Date Range', style: TextStyle(fontSize: 12, color: _dateRange != null ? _brand : Colors.grey.shade700)),
+                  backgroundColor: _dateRange != null ? _brand.withOpacity(0.1) : Colors.grey.shade100,
+                  side: BorderSide(color: _dateRange != null ? _brand : Colors.grey.shade300),
+                  onPressed: _pickDateRange,
+                ),
+                const SizedBox(width: 8),
+                // Category Chip
+                _buildDropdownChip('Category', _catFilter, _categories, (v) { _catFilter = v ?? 'All'; _applyFilters(); }),
+                const SizedBox(width: 8),
+                // Reference Chip
+                _buildDropdownChip('Reference', _refFilter, _references, (v) { _refFilter = v ?? 'All'; _applyFilters(); }),
+                // Clear All
+                if (hasActiveFilter) ...[
+                  const SizedBox(width: 8),
+                  ActionChip(
+                    avatar: const Icon(Icons.clear_all, size: 14, color: Colors.red),
+                    label: const Text('Clear', style: TextStyle(fontSize: 12, color: Colors.red)),
+                    backgroundColor: Colors.red.withOpacity(0.06),
+                    side: const BorderSide(color: Colors.red),
+                    onPressed: () { _dateRange = null; _catFilter = 'All'; _refFilter = 'All'; _applyFilters(); },
+                  ),
+                ],
+              ],
             ),
           ),
         ),
 
         // Summary Stats Row
-        if (!_isLoading && _bookings.isNotEmpty)
+        if (!_isLoading && _filtered.isNotEmpty)
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
             child: Row(
               children: [
-                _buildStatChip(Icons.receipt_long, '$totalBookings', 'Bookings'),
+                _buildStatChip(Icons.receipt_long, '${_filtered.length}', 'Bookings'),
                 const SizedBox(width: 8),
                 _buildStatChip(Icons.people, '$totalHissah', 'Hissahs'),
                 const SizedBox(width: 8),
@@ -1151,89 +1292,128 @@ class _HistoryTabState extends State<_HistoryTab> {
             ),
           ),
 
+        // Reference Breakdown Toggle
+        if (!_isLoading && _filtered.isNotEmpty && widget.settings.referenceAsDropdown)
+          Container(
+            color: Colors.white,
+            child: InkWell(
+              onTap: () => setState(() => _showRefBreakdown = !_showRefBreakdown),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(_showRefBreakdown ? Icons.expand_less : Icons.expand_more, color: _brand, size: 20),
+                    const SizedBox(width: 6),
+                    Text('Reference Breakdown', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _brand)),
+                    const Spacer(),
+                    Text('${_refBreakdownMap.length} sources', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+        // Reference Breakdown Details
+        if (_showRefBreakdown && _filtered.isNotEmpty)
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              children: _refBreakdownMap.entries.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(color: _brand.withOpacity(0.04), borderRadius: BorderRadius.circular(8)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.group, size: 16, color: _brand),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis)),
+                      Text('${e.value.count} bookings', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                      const SizedBox(width: 12),
+                      Text('${e.value.hissahs} hissah', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                      const SizedBox(width: 12),
+                      Text('${widget.settings.currencySymbol}${e.value.amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _brand)),
+                    ],
+                  ),
+                ),
+              )).toList(),
+            ),
+          ),
+
+        // Divider
+        Container(height: 1, color: Colors.grey.shade200),
+
         // Booking List
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: _brand))
-              : _bookings.isEmpty
+              : _filtered.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
                           const SizedBox(height: 16),
-                          Text(_searchCtrl.text.isNotEmpty ? 'No results for "${_searchCtrl.text}"' : 'No bookings yet.', style: TextStyle(color: Colors.grey.shade400, fontSize: 16)),
+                          Text(hasActiveFilter ? 'No results for applied filters' : 'No bookings yet.', style: TextStyle(color: Colors.grey.shade400, fontSize: 16)),
                         ],
                       ),
                     )
                   : RefreshIndicator(
                       color: _brand,
-                      onRefresh: () => _loadBookings(query: _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null),
+                      onRefresh: _loadBookings,
                       child: ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        itemCount: _bookings.length,
+                        itemCount: _filtered.length,
                         itemBuilder: (ctx, i) {
-                          final b = _bookings[i];
+                          final b = _filtered[i];
                           final date = DateTime.tryParse(b['created_at'] ?? '')?.toLocal();
                           final dateStr = date != null ? '${date.day}/${date.month}/${date.year}' : '';
                           final hissah = b['hissah_count'] ?? 0;
                           final amount = (b['total_amount'] ?? 0).toDouble();
-                          final category = b['category_title'] ?? '';
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
+                              color: Colors.white, borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: Colors.grey.shade100),
                               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
                             ),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(16),
                               onTap: () async {
-                                await showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (ctx) => _BookingDetailSheet(bookingId: b['id'], settings: widget.settings),
-                                );
+                                await showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
+                                  builder: (ctx) => _BookingDetailSheet(bookingId: b['id'], settings: widget.settings));
                                 _loadBookings();
                               },
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Row(
                                   children: [
-                                    // Avatar with initials
                                     CircleAvatar(
-                                      backgroundColor: _brand.withOpacity(0.1),
-                                      radius: 24,
+                                      backgroundColor: _brand.withOpacity(0.1), radius: 24,
                                       child: Text(
                                         (b['representative_name'] ?? 'N').toString().isNotEmpty
-                                            ? (b['representative_name'] ?? 'N').toString().substring(0, 1).toUpperCase()
-                                            : 'N',
+                                            ? (b['representative_name'] ?? 'N').toString().substring(0, 1).toUpperCase() : 'N',
                                         style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 18),
                                       ),
                                     ),
                                     const SizedBox(width: 14),
-                                    // Name, receipt, date
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis, maxLines: 1),
                                           const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Icon(Icons.receipt, size: 13, color: Colors.grey.shade500),
-                                              const SizedBox(width: 4),
-                                              Flexible(child: Text('${b['receipt_no'] ?? ''}${dateStr.isNotEmpty ? '  •  $dateStr' : ''}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12), overflow: TextOverflow.ellipsis)),
-                                            ],
-                                          ),
+                                          Row(children: [
+                                            Icon(Icons.receipt, size: 13, color: Colors.grey.shade500),
+                                            const SizedBox(width: 4),
+                                            Flexible(child: Text('${b['receipt_no'] ?? ''}${dateStr.isNotEmpty ? '  •  $dateStr' : ''}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                          ]),
                                         ],
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    // Right side: amount + hissah count
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
@@ -1241,10 +1421,7 @@ class _HistoryTabState extends State<_HistoryTab> {
                                         const SizedBox(height: 4),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: _brand.withOpacity(0.08),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
+                                          decoration: BoxDecoration(color: _brand.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
                                           child: Text('$hissah Hissah', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.w600)),
                                         ),
                                       ],
@@ -1264,14 +1441,32 @@ class _HistoryTabState extends State<_HistoryTab> {
     );
   }
 
+  Widget _buildDropdownChip(String label, String value, List<String> options, ValueChanged<String?> onChanged) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: value != 'All' ? _brand.withOpacity(0.1) : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: value != 'All' ? _brand : Colors.grey.shade300),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isDense: true,
+          icon: Icon(Icons.arrow_drop_down, size: 18, color: value != 'All' ? _brand : Colors.grey.shade600),
+          style: TextStyle(fontSize: 12, color: value != 'All' ? _brand : Colors.grey.shade700),
+          items: options.map((o) => DropdownMenuItem(value: o, child: Text(o == 'All' ? label : o))).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatChip(IconData icon, String value, String label) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          color: _brand.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration: BoxDecoration(color: _brand.withOpacity(0.06), borderRadius: BorderRadius.circular(10)),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1292,6 +1487,13 @@ class _HistoryTabState extends State<_HistoryTab> {
     );
   }
 }
+
+class _RefBreakdown {
+  int count = 0;
+  int hissahs = 0;
+  double amount = 0;
+}
+
 
 class _MoveEntrySheet extends StatefulWidget {
   final List<Map<String, dynamic>> entries;

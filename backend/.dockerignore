@@ -1,0 +1,6 @@
+qurbani.db
+qurbani.db-shm
+qurbani.db-wal
+__pycache__/
+*.pyc
+.env
