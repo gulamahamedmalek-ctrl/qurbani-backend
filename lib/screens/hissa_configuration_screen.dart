@@ -27,9 +27,22 @@ class _HissaConfigurationScreenState extends State<HissaConfigurationScreen> {
   }
 
   Future<void> _loadCategories() async {
-    setState(() => _isLoading = true);
+    // 1. Try to load from CACHE first for instant feedback
+    if (_categories.isEmpty) {
+      final cached = await DatabaseService.loadCategories(useCache: true);
+      if (cached.isNotEmpty && mounted) {
+        setState(() {
+          _categories = cached;
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Fetch fresh data from network
+    if (_categories.isEmpty) setState(() => _isLoading = true);
     final data = await DatabaseService.loadCategories();
     final settings = await DatabaseService.loadFormSettings();
+    if (!mounted) return;
     setState(() {
       _categories = data;
       _currencySymbol = settings.currencySymbol;

@@ -1,119 +1,164 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/qurbani_category.dart';
 import '../models/form_settings.dart';
 
 /// Single service layer for ALL backend communication.
 /// Every screen imports this — change the base URL once, everything updates.
 class DatabaseService {
-  // ── SERVER URL CONFIGURATION ──
-  // The app now connects to your LIVE backend on Hugging Face Spaces
-  static const String _liveBaseUrl = 'https://ibrahimmalek608-qurbani-api.hf.space/api';
-
-  static String get _baseUrl {
-    if (kIsWeb) {
-      // For local web testing, you can still use localhost if you want, 
-      // but for consistency we'll use the live URL
-      return _liveBaseUrl;
-    } else {
-      // For the APK/Phone, we use the live public URL
-      return _liveBaseUrl;
-    }
-  }
+  // ── DUAL BACKEND: Primary (Singapore) + Failover (US) ──
+  static const String _primaryUrl = 'https://qurbani-api.onrender.com/api';   // Render — Singapore (fast for India)
+  static const String _fallbackUrl = 'https://ibrahimmalek608-qurbani-api.hf.space/api'; // HF — US (backup)
+  static const Duration _timeout = Duration(seconds: 10);
 
   // ═══════════════════════════════════════════════════════
-  // REUSABLE HTTP HELPERS — Written once, used everywhere
+  // SMART FAILOVER HTTP HELPERS
+  // Try Primary (Render/Singapore) first → if it fails → auto-switch to Fallback (HF/US)
   // ═══════════════════════════════════════════════════════
 
-  /// Generic GET request with try/catch and JSON parsing.
+  /// Generic GET with failover.
   static Future<Map<String, dynamic>> _get(String endpoint) async {
+    // Try primary first
     try {
-      final response = await http.get(Uri.parse('$_baseUrl$endpoint'));
+      final response = await http.get(Uri.parse('$_primaryUrl$endpoint')).timeout(_timeout);
+      if (response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) return decoded;
+      }
+    } catch (_) {}
+
+    // Fallback to secondary
+    try {
+      final response = await http.get(Uri.parse('$_fallbackUrl$endpoint')).timeout(_timeout);
       if (response.body.isEmpty) {
-        return {'success': false, 'message': 'Empty response (Status: ${response.statusCode})', 'data': null};
+        return {'success': false, 'message': 'Both servers returned empty response', 'data': null};
       }
-      try {
-        return jsonDecode(response.body);
-      } catch (e) {
-        return {'success': false, 'message': 'Invalid JSON: ${response.body.substring(0, response.body.length > 50 ? 50 : response.body.length)}', 'data': null};
-      }
+      return jsonDecode(response.body);
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e', 'data': null};
+      return {'success': false, 'message': 'Network error (both servers down): $e', 'data': null};
     }
   }
 
-  /// Generic POST request with try/catch and JSON body.
+  /// Generic POST with failover.
   static Future<Map<String, dynamic>> _post(String endpoint, Map<String, dynamic> body) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl$endpoint'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
-      
-      if (response.body.isEmpty) {
-        return {'success': false, 'message': 'Server returned empty response (Status: ${response.statusCode})', 'data': null};
-      }
+    final headers = {'Content-Type': 'application/json'};
+    final encodedBody = jsonEncode(body);
 
-      try {
-        return jsonDecode(response.body);
-      } catch (e) {
-        return {'success': false, 'message': 'Invalid JSON response: ${response.body.substring(0, response.body.length > 50 ? 50 : response.body.length)}', 'data': null};
+    // Try primary first
+    try {
+      final response = await http.post(Uri.parse('$_primaryUrl$endpoint'), headers: headers, body: encodedBody).timeout(_timeout);
+      if (response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) return decoded;
       }
+    } catch (_) {}
+
+    // Fallback to secondary
+    try {
+      final response = await http.post(Uri.parse('$_fallbackUrl$endpoint'), headers: headers, body: encodedBody).timeout(_timeout);
+      if (response.body.isEmpty) {
+        return {'success': false, 'message': 'Both servers returned empty response', 'data': null};
+      }
+      return jsonDecode(response.body);
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e', 'data': null};
+      return {'success': false, 'message': 'Network error (both servers down): $e', 'data': null};
     }
   }
 
-  /// Generic PUT request with try/catch and JSON body.
+  /// Generic PUT with failover.
   static Future<Map<String, dynamic>> _put(String endpoint, Map<String, dynamic> body) async {
+    final headers = {'Content-Type': 'application/json'};
+    final encodedBody = jsonEncode(body);
+
+    // Try primary first
     try {
-      final response = await http.put(
-        Uri.parse('$_baseUrl$endpoint'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
+      final response = await http.put(Uri.parse('$_primaryUrl$endpoint'), headers: headers, body: encodedBody).timeout(_timeout);
+      if (response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) return decoded;
+      }
+    } catch (_) {}
+
+    // Fallback to secondary
+    try {
+      final response = await http.put(Uri.parse('$_fallbackUrl$endpoint'), headers: headers, body: encodedBody).timeout(_timeout);
       if (response.body.isEmpty) {
-        return {'success': false, 'message': 'Empty response (Status: ${response.statusCode})', 'data': null};
+        return {'success': false, 'message': 'Both servers returned empty response', 'data': null};
       }
-      try {
-        return jsonDecode(response.body);
-      } catch (e) {
-        return {'success': false, 'message': 'Invalid JSON: ${response.body.substring(0, response.body.length > 50 ? 50 : response.body.length)}', 'data': null};
-      }
+      return jsonDecode(response.body);
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e', 'data': null};
+      return {'success': false, 'message': 'Network error (both servers down): $e', 'data': null};
     }
   }
 
-  /// Generic DELETE request with try/catch.
+  /// Generic DELETE with failover.
   static Future<Map<String, dynamic>> _delete(String endpoint) async {
+    // Try primary first
     try {
-      final response = await http.delete(Uri.parse('$_baseUrl$endpoint'));
+      final response = await http.delete(Uri.parse('$_primaryUrl$endpoint')).timeout(_timeout);
+      if (response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) return decoded;
+      }
+    } catch (_) {}
+
+    // Fallback to secondary
+    try {
+      final response = await http.delete(Uri.parse('$_fallbackUrl$endpoint')).timeout(_timeout);
       if (response.body.isEmpty) {
-        return {'success': false, 'message': 'Empty response (Status: ${response.statusCode})', 'data': null};
+        return {'success': false, 'message': 'Both servers returned empty response', 'data': null};
       }
-      try {
-        return jsonDecode(response.body);
-      } catch (e) {
-        return {'success': false, 'message': 'Invalid JSON: ${response.body.substring(0, response.body.length > 50 ? 50 : response.body.length)}', 'data': null};
-      }
+      return jsonDecode(response.body);
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e', 'data': null};
+      return {'success': false, 'message': 'Network error (both servers down): $e', 'data': null};
     }
+  }
+
+  // ── CACHING HELPERS ──
+  static Future<void> _saveToCache(String key, dynamic data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cache_$key', jsonEncode(data));
+    } catch (e) {
+      // Fail silently
+    }
+  }
+
+  static Future<dynamic> _getFromCache(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cache_$key');
+      if (str != null) return jsonDecode(str);
+    } catch (e) {
+      // Fail silently
+    }
+    return null;
   }
 
   // ═══════════════════════════════════════════════════════
   // CATEGORIES
   // ═══════════════════════════════════════════════════════
 
-  static Future<List<QurbaniCategory>> loadCategories() async {
+  static Future<List<QurbaniCategory>> loadCategories({bool useCache = false}) async {
+    if (useCache) {
+      final cached = await _getFromCache('categories');
+      if (cached != null) {
+        return (cached as List).map((e) => QurbaniCategory(
+          id: e['id'].toString(),
+          title: e['title'] ?? '',
+          subtitle: e['subtitle'] ?? '',
+          amount: (e['amount'] ?? 0).toDouble(),
+          hissahPerToken: e['hissah_per_token'] ?? 7,
+        )).toList();
+      }
+    }
+
     try {
       final result = await _get('/categories/');
       if (result['success'] == true && result['data'] != null) {
         final List<dynamic> list = result['data'];
+        await _saveToCache('categories', list);
         return list.map((e) => QurbaniCategory(
           id: e['id'].toString(),
           title: e['title'] ?? '',
@@ -152,10 +197,16 @@ class DatabaseService {
   // FORM SETTINGS
   // ═══════════════════════════════════════════════════════
 
-  static Future<FormSettings> loadFormSettings() async {
+  static Future<FormSettings> loadFormSettings({bool useCache = false}) async {
+    if (useCache) {
+      final cached = await _getFromCache('settings');
+      if (cached != null) return FormSettings.fromJson(cached);
+    }
+
     try {
       final result = await _get('/settings/');
       if (result['success'] == true && result['data'] != null) {
+        await _saveToCache('settings', result['data']);
         return FormSettings.fromJson(result['data']);
       }
     } catch (e) {
@@ -211,12 +262,19 @@ class DatabaseService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> loadBookings({String? query}) async {
+  static Future<List<Map<String, dynamic>>> loadBookings({String? query, bool useCache = false}) async {
+    if (useCache && query == null) {
+      final cached = await _getFromCache('bookings');
+      if (cached != null) return List<Map<String, dynamic>>.from(cached);
+    }
+
     try {
       final endpoint = query != null ? '/bookings/?query=${Uri.encodeComponent(query)}' : '/bookings/';
       final result = await _get(endpoint);
       if (result['success'] == true && result['data'] != null) {
-        return List<Map<String, dynamic>>.from(result['data']);
+        final data = List<Map<String, dynamic>>.from(result['data']);
+        if (query == null) await _saveToCache('bookings', data);
+        return data;
       }
     } catch (e) {
       // Fallback silently
@@ -255,12 +313,19 @@ class DatabaseService {
   // TOKENS
   // ═══════════════════════════════════════════════════════
 
-  static Future<List<Map<String, dynamic>>> loadTokens({String? category}) async {
+  static Future<List<Map<String, dynamic>>> loadTokens({String? category, bool useCache = false}) async {
+    if (useCache && category == null) {
+      final cached = await _getFromCache('tokens');
+      if (cached != null) return List<Map<String, dynamic>>.from(cached);
+    }
+
     try {
       final endpoint = category != null ? '/tokens/?category=$category' : '/tokens/';
       final result = await _get(endpoint);
       if (result['success'] == true && result['data'] != null) {
-        return List<Map<String, dynamic>>.from(result['data']);
+        final data = List<Map<String, dynamic>>.from(result['data']);
+        if (category == null) await _saveToCache('tokens', data);
+        return data;
       }
     } catch (e) {
       // Fallback silently

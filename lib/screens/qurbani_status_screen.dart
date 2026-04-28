@@ -49,7 +49,20 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
   }
 
   Future<void> _loadTokens() async {
-    setState(() => _isLoading = true);
+    // 1. Try to load from CACHE first for instant feedback
+    if (_allTokens.isEmpty) {
+      final cached = await DatabaseService.loadTokens(useCache: true);
+      if (cached.isNotEmpty && mounted) {
+        setState(() {
+          _allTokens = cached;
+          _isLoading = false;
+        });
+        _applyFilters();
+      }
+    }
+
+    // 2. Fetch fresh data from network
+    if (_allTokens.isEmpty) setState(() => _isLoading = true);
     final tokens = await DatabaseService.loadTokens();
     final settings = await DatabaseService.loadFormSettings();
     final cats = tokens.map((t) => t['category_title'].toString()).toSet().toList();
@@ -63,7 +76,6 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
       _isLoading = false;
       // Preserve selection if possible, prune stale references
       _selectedTokenIds.retainWhere((id) => tokens.any((t) => t['id'] == id));
-      // Bug #3 fix: prune entry selections that no longer exist after refresh
       final allEntryIds = <int>{};
       for (var t in tokens) {
         for (var e in List<Map<String, dynamic>>.from(t['entries'] ?? [])) {
@@ -1061,7 +1073,19 @@ class _HistoryTabState extends State<_HistoryTab> {
   }
 
   Future<void> _loadBookings({String? query}) async {
-    setState(() => _isLoading = true);
+    // 1. Try to load from CACHE first for instant feedback (only for default list)
+    if (query == null && _bookings.isEmpty) {
+      final cached = await DatabaseService.loadBookings(useCache: true);
+      if (cached.isNotEmpty && mounted) {
+        setState(() {
+          _bookings = cached;
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Fetch fresh data from network
+    if (_bookings.isEmpty) setState(() => _isLoading = true);
     final results = await DatabaseService.loadBookings(query: query);
     if (mounted) {
       setState(() {
@@ -1122,9 +1146,7 @@ class _HistoryTabState extends State<_HistoryTab> {
                 const SizedBox(width: 8),
                 _buildStatChip(Icons.people, '$totalHissah', 'Hissahs'),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _buildStatChip(Icons.account_balance_wallet, '${widget.settings.currencySymbol}${totalAmount.toStringAsFixed(0)}', 'Collected'),
-                ),
+                _buildStatChip(Icons.account_balance_wallet, '${widget.settings.currencySymbol}${totalAmount.toStringAsFixed(0)}', 'Collected'),
               ],
             ),
           ),
@@ -1198,17 +1220,13 @@ class _HistoryTabState extends State<_HistoryTab> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis),
+                                          Text(b['representative_name'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis, maxLines: 1),
                                           const SizedBox(height: 4),
                                           Row(
                                             children: [
                                               Icon(Icons.receipt, size: 13, color: Colors.grey.shade500),
                                               const SizedBox(width: 4),
-                                              Text(b['receipt_no'] ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                                              if (dateStr.isNotEmpty) ...[
-                                                Text('  •  ', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                                                Text(dateStr, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-                                              ],
+                                              Flexible(child: Text('${b['receipt_no'] ?? ''}${dateStr.isNotEmpty ? '  •  $dateStr' : ''}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12), overflow: TextOverflow.ellipsis)),
                                             ],
                                           ),
                                         ],

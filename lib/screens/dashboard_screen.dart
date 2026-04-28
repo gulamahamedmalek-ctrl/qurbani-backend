@@ -25,11 +25,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadBranding() async {
+    // 1. Load from cache for instant logo/name
+    final cachedSettings = await DatabaseService.loadFormSettings(useCache: true);
+    if (mounted) {
+      setState(() {
+        _orgName = cachedSettings.organizationName;
+        _logoBase64 = cachedSettings.logoBase64;
+      });
+    }
+
+    // 2. Fetch fresh from network
     final settings = await DatabaseService.loadFormSettings();
-    setState(() {
-      _orgName = settings.organizationName;
-      _logoBase64 = settings.logoBase64;
-    });
+    if (mounted) {
+      setState(() {
+        _orgName = settings.organizationName;
+        _logoBase64 = settings.logoBase64;
+      });
+    }
   }
 
   void _navigateToAdmin() {
