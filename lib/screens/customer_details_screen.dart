@@ -393,7 +393,16 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     child: DropdownButtonFormField<String>(
                       value: _referenceController.text.isNotEmpty && _settings.referenceOptions.contains(_referenceController.text) ? _referenceController.text : null,
                       decoration: const InputDecoration(labelText: 'Reference'),
+                      isExpanded: true,
                       items: _settings.referenceOptions.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
+                      selectedItemBuilder: (context) {
+                        return _settings.referenceOptions.map((opt) {
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(opt, overflow: TextOverflow.ellipsis, maxLines: 1),
+                          );
+                        }).toList();
+                      },
                       onChanged: (val) => _referenceController.text = val ?? '',
                     ),
                   )
