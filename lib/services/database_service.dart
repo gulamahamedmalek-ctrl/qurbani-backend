@@ -397,4 +397,32 @@ class DatabaseService {
       return {'success': false, 'message': 'Failed to bulk move: $e'};
     }
   }
+
+  // ═══════════════════════════════════════════════════════
+  // ADMIN
+  // ═══════════════════════════════════════════════════════
+
+  static Future<bool> verifyAdminPin(String pin) async {
+    try {
+      final result = await _post('/admin/verify', {'pin': pin});
+      return result['success'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> resetAllData(String pin) async {
+    try {
+      final result = await _post('/admin/reset', {'pin': pin});
+      if (result['success'] == true) {
+        // Clear local cache too
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('cache_bookings');
+        await prefs.remove('cache_tokens');
+      }
+      return result;
+    } catch (e) {
+      return {'success': false, 'message': 'Reset failed: $e'};
+    }
+  }
 }

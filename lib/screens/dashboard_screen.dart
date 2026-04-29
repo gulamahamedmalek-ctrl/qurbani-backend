@@ -15,6 +15,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  static const Color _brand = Color(0xFF0D5C46);
   String _orgName = 'Qurbani Management';
   String _logoBase64 = '';
 
@@ -44,10 +45,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _navigateToAdmin() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen())).then((_) => _loadBranding());
+  /// Show admin PIN dialog. Returns true if verified.
+  Future<bool> _verifyAdminPin() async {
+    final pinCtrl = TextEditingController();
+    bool isVerifying = false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: _brand.withOpacity(0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.lock, color: _brand, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text('Admin Access', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter admin PIN to access this module.', style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: pinCtrl,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                autofocus: true,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: '• • • •',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _brand, width: 2)),
+                ),
+                onSubmitted: (_) async {
+                  if (pinCtrl.text.isEmpty) return;
+                  setDialogState(() => isVerifying = true);
+                  final ok = await DatabaseService.verifyAdminPin(pinCtrl.text);
+                  if (ok) {
+                    Navigator.pop(ctx, true);
+                  } else {
+                    setDialogState(() => isVerifying = false);
+                    pinCtrl.clear();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Wrong PIN. Try again.'), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: isVerifying
+                  ? null
+                  : () async {
+                      if (pinCtrl.text.isEmpty) return;
+                      setDialogState(() => isVerifying = true);
+                      final ok = await DatabaseService.verifyAdminPin(pinCtrl.text);
+                      if (ok) {
+                        Navigator.pop(ctx, true);
+                      } else {
+                        setDialogState(() => isVerifying = false);
+                        pinCtrl.clear();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Wrong PIN. Try again.'), backgroundColor: Colors.red),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: _brand, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              child: isVerifying
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Unlock'),
+            ),
+          ],
+        ),
+      ),
+    );
+    return result == true;
   }
 
+  void _navigateToAdmin() async {
+    if (await _verifyAdminPin()) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen())).then((_) => _loadBranding());
+    }
+  }
+
+  void _navigateToTracking() async {
+    if (await _verifyAdminPin()) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const QurbaniStatusScreen()));
+    }
+  }
 
   Widget _buildDashboardCard(
     BuildContext context, {
@@ -56,6 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    bool isLocked = false,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -87,6 +186,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
+            if (isLocked)
+              Icon(Icons.lock, color: Colors.grey.shade400, size: 18),
+            const SizedBox(width: 4),
             Icon(Icons.chevron_right, color: Colors.grey.shade300, size: 24),
           ],
         ),
@@ -151,7 +253,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black87, letterSpacing: -0.5, height: 1.1),
                         ),
                         const SizedBox(height: 4),
-                        Text('Select a module below to proceed.', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                        Text('Qurbani Hissah Management', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
                       ],
                     ),
                   ),
@@ -159,16 +261,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 32),
 
-              _buildDashboardCard(
-                context,
-                title: 'Master Module',
-                subtitle: 'Admin panel to configure everything.',
-                icon: Icons.admin_panel_settings,
-                color: Colors.blueGrey.shade700,
-                onTap: _navigateToAdmin,
+              // PUBLIC — Everyone can access
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 8),
+                child: Text('BOOKING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade500, letterSpacing: 1.2)),
               ),
-
-              const SizedBox(height: 12),
 
               _buildDashboardCard(
                 context,
@@ -181,17 +278,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 },
               ),
 
+              const SizedBox(height: 24),
+
+              // ADMIN ONLY — Requires PIN
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 8),
+                child: Text('ADMIN ONLY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade500, letterSpacing: 1.2)),
+              ),
+
+              _buildDashboardCard(
+                context,
+                title: 'Master Module',
+                subtitle: 'Configure categories, settings & branding.',
+                icon: Icons.admin_panel_settings,
+                color: Colors.blueGrey.shade700,
+                onTap: _navigateToAdmin,
+                isLocked: true,
+              ),
+
               const SizedBox(height: 12),
 
               _buildDashboardCard(
                 context,
                 title: 'Live Tracking Board',
-                subtitle: 'Monitor tokens and confirm executed Qurbanis.',
+                subtitle: 'Monitor tokens, history & export reports.',
                 icon: Icons.fact_check_rounded,
                 color: Colors.teal.shade800,
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const QurbaniStatusScreen()));
-                },
+                onTap: _navigateToTracking,
+                isLocked: true,
               ),
             ],
           ),

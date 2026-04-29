@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
 def _generate_receipt_no(db: Session) -> str:
     """
     Auto-generate the next receipt number using the admin's configured prefix.
-    Reusable logic isolated in one place — if the format ever changes, fix it here only.
+    Uses COUNT of existing bookings (not max ID) so numbers reset correctly after data wipe.
     """
     # Get receipt prefix from settings
     prefix = "RCPT-"
@@ -32,13 +32,9 @@ def _generate_receipt_no(db: Session) -> str:
         except (json.JSONDecodeError, KeyError):
             pass
 
-    # Get the current highest booking ID to determine next number
-    max_id = db.query(func.max(Booking.id)).scalar() or 0
-    
-    # Next number = (historical bookings count) + custom start offset
-    # If this is the very first booking (max_id = 0), it gets exactly start_num
-    # If someone booked 5 people already (max_id = 5), next is start_num + 5
-    next_number = max_id + start_num
+    # Count existing bookings (not max ID — survives data resets)
+    count = db.query(func.count(Booking.id)).scalar() or 0
+    next_number = count + start_num
     return f"{prefix}{next_number}"
 
 
