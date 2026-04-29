@@ -11,7 +11,7 @@ class QurbaniHissaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Qurbani Hissa App',
+      title: 'Ahem Faridah',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF0D5C46), // Primary Islamic Green
