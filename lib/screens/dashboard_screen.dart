@@ -45,104 +45,102 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  /// Show admin PIN dialog. Returns true if verified.
-  Future<bool> _verifyAdminPin() async {
-    final pinCtrl = TextEditingController();
+  /// Show admin login dialog. Returns true if verified.
+  Future<bool> _verifyAdmin() async {
+    final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
     bool isVerifying = false;
+    bool obscurePass = true;
 
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: _brand.withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.lock, color: _brand, size: 24),
-              ),
-              const SizedBox(width: 12),
-              const Text('Admin Access', style: TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Enter admin PIN to access this module.', style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: pinCtrl,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                autofocus: true,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
-                decoration: InputDecoration(
-                  hintText: '• • • •',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _brand, width: 2)),
+        builder: (ctx, setDialogState) {
+          Future<void> doLogin() async {
+            if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) return;
+            setDialogState(() => isVerifying = true);
+            final ok = await DatabaseService.verifyAdmin(emailCtrl.text.trim(), passCtrl.text);
+            if (ok) {
+              Navigator.pop(ctx, true);
+            } else {
+              setDialogState(() => isVerifying = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Invalid credentials'), backgroundColor: Colors.red),
+              );
+            }
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: _brand.withOpacity(0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.admin_panel_settings, color: _brand, size: 24),
                 ),
-                onSubmitted: (_) async {
-                  if (pinCtrl.text.isEmpty) return;
-                  setDialogState(() => isVerifying = true);
-                  final ok = await DatabaseService.verifyAdminPin(pinCtrl.text);
-                  if (ok) {
-                    Navigator.pop(ctx, true);
-                  } else {
-                    setDialogState(() => isVerifying = false);
-                    pinCtrl.clear();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Wrong PIN. Try again.'), backgroundColor: Colors.red),
-                    );
-                  }
-                },
+                const SizedBox(width: 12),
+                const Text('Admin Login', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: const Icon(Icons.email_outlined, color: _brand),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: obscurePass,
+                  onSubmitted: (_) => doLogin(),
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.lock_outline, color: _brand),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePass ? Icons.visibility_off : Icons.visibility, size: 20),
+                      onPressed: () => setDialogState(() => obscurePass = !obscurePass),
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: isVerifying ? null : doLogin,
+                style: ElevatedButton.styleFrom(backgroundColor: _brand, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                child: isVerifying
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Login'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: isVerifying
-                  ? null
-                  : () async {
-                      if (pinCtrl.text.isEmpty) return;
-                      setDialogState(() => isVerifying = true);
-                      final ok = await DatabaseService.verifyAdminPin(pinCtrl.text);
-                      if (ok) {
-                        Navigator.pop(ctx, true);
-                      } else {
-                        setDialogState(() => isVerifying = false);
-                        pinCtrl.clear();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Wrong PIN. Try again.'), backgroundColor: Colors.red),
-                        );
-                      }
-                    },
-              style: ElevatedButton.styleFrom(backgroundColor: _brand, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-              child: isVerifying
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('Unlock'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
     return result == true;
   }
 
   void _navigateToAdmin() async {
-    if (await _verifyAdminPin()) {
+    if (await _verifyAdmin()) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen())).then((_) => _loadBranding());
     }
   }
 
   void _navigateToTracking() async {
-    if (await _verifyAdminPin()) {
+    if (await _verifyAdmin()) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const QurbaniStatusScreen()));
     }
   }

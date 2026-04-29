@@ -42,40 +42,44 @@ def health_check():
     return {"status": "ok", "message": "Qurbani Hissah API is running"}
 
 
-class AdminPinPayload(BaseModel):
-    pin: str
+class AdminLoginPayload(BaseModel):
+    email: str
+    password: str
 
 
 @app.post("/api/admin/verify", tags=["Admin"])
-def verify_admin_pin(payload: AdminPinPayload, db: Session = Depends(get_db)):
-    """Verify admin PIN. Returns success if PIN matches."""
-    admin_pin = "1234"  # Default
+def verify_admin_login(payload: AdminLoginPayload, db: Session = Depends(get_db)):
+    """Verify admin email + password. Returns success if credentials match."""
+    admin_email = "taalimulquran@madrasa.com"
+    admin_password = "ahemfariza@0011"
     settings_row = db.query(FormSettingsRow).filter(FormSettingsRow.id == 1).first()
     if settings_row:
         try:
             data = json.loads(settings_row.settings_json)
-            admin_pin = data.get("adminPin", "1234")
+            admin_email = data.get("adminEmail", admin_email)
+            admin_password = data.get("adminPassword", admin_password)
         except:
             pass
-    if payload.pin == admin_pin:
+    if payload.email == admin_email and payload.password == admin_password:
         return {"success": True, "message": "Admin verified"}
-    return {"success": False, "message": "Invalid PIN"}
+    return {"success": False, "message": "Invalid credentials"}
 
 
 @app.post("/api/admin/reset", tags=["Admin"])
-def reset_data(payload: AdminPinPayload, db: Session = Depends(get_db)):
+def reset_data(payload: AdminLoginPayload, db: Session = Depends(get_db)):
     """Erase all bookings and tokens. Keeps categories and settings."""
-    # Verify admin PIN first
-    admin_pin = "1234"
+    admin_email = "taalimulquran@madrasa.com"
+    admin_password = "ahemfariza@0011"
     settings_row = db.query(FormSettingsRow).filter(FormSettingsRow.id == 1).first()
     if settings_row:
         try:
             data = json.loads(settings_row.settings_json)
-            admin_pin = data.get("adminPin", "1234")
+            admin_email = data.get("adminEmail", admin_email)
+            admin_password = data.get("adminPassword", admin_password)
         except:
             pass
-    if payload.pin != admin_pin:
-        return {"success": False, "message": "Invalid admin PIN"}
+    if payload.email != admin_email or payload.password != admin_password:
+        return {"success": False, "message": "Invalid credentials"}
 
     try:
         db.query(TokenEntry).delete()
@@ -86,4 +90,5 @@ def reset_data(payload: AdminPinPayload, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         return {"success": False, "message": f"Reset failed: {str(e)}"}
+
 

@@ -402,18 +402,18 @@ class DatabaseService {
   // ADMIN
   // ═══════════════════════════════════════════════════════
 
-  static Future<bool> verifyAdminPin(String pin) async {
+  static Future<bool> verifyAdmin(String email, String password) async {
     try {
-      final result = await _post('/admin/verify', {'pin': pin});
+      final result = await _post('/admin/verify', {'email': email, 'password': password});
       return result['success'] == true;
     } catch (e) {
       return false;
     }
   }
 
-  static Future<Map<String, dynamic>> resetAllData(String pin) async {
+  static Future<Map<String, dynamic>> resetAllData(String email, String password) async {
     try {
-      final result = await _post('/admin/reset', {'pin': pin});
+      final result = await _post('/admin/reset', {'email': email, 'password': password});
       if (result['success'] == true) {
         // Clear local cache too
         final prefs = await SharedPreferences.getInstance();
