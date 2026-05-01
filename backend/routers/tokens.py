@@ -55,6 +55,7 @@ def assign_names_to_tokens(
             partial_token = (
                 db.query(Token)
                 .filter(
+                    Token.category_title == category_title,
                     Token.max_slots == max_slots,
                     Token.status == "partial",
                     Token.qurbani_done == False
