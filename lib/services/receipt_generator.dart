@@ -268,34 +268,46 @@ class ReceiptGenerator {
       ));
     }
 
-    leftWidgets.add(pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Container(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(3)),
-          child: pw.Text('Qurbani Department',
-              style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: bg)),
-        ),
-        pw.SizedBox(height: 4),
-        pw.Text(orgName,
-            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
-      ],
+    // Auto-size org name font: shrink if name is long
+    final nameSize = orgName.length > 20 ? 12.0 : 16.0;
+
+    leftWidgets.add(pw.Expanded(
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(3)),
+            child: pw.Text('Qurbani Department',
+                style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: bg)),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(orgName,
+              style: pw.TextStyle(fontSize: nameSize, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+              maxLines: 2,
+              overflow: pw.TextOverflow.clip),
+        ],
+      ),
     ));
 
     return pw.Container(
       color: bg,
       padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 14),
       child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          pw.Row(children: leftWidgets),
+          // Left: Logo + Org name (flexible, takes remaining space)
+          pw.Expanded(child: pw.Row(children: leftWidgets)),
+          pw.SizedBox(width: 10),
+          // Right: Receipt info (fixed width, never gets pushed off)
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: [
               _labelValue('Receipt No.', receiptNo, PdfColors.white),
               pw.SizedBox(height: 3),
               _labelValue('Date', date, PdfColors.white),
+              pw.SizedBox(height: 3),
+              _labelValue('Token', tokenNo, PdfColors.white),
             ],
           ),
         ],

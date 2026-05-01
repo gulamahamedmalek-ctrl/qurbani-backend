@@ -7,6 +7,8 @@ import '../services/slaughter_list_generator.dart';
 import 'customer_details_screen.dart';
 import 'dart:convert';
 
+import '../widgets/validated_dropdown.dart';
+
 class QurbaniStatusScreen extends StatefulWidget {
   const QurbaniStatusScreen({super.key});
 
@@ -424,21 +426,22 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
           const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
             child: Row(
               children: [
-                _buildDropdownFilter('Status', ['All', 'Pending', 'Done'], _statusFilter, (v) { setState(() => _statusFilter = v!); _applyFilters(); }),
+                _buildDropdownFilter('Status', ['All', 'Pending', 'Done'], _statusFilter, (v) { setState(() => _statusFilter = v ?? _statusFilter); _applyFilters(); }),
                 const SizedBox(width: 10),
-                _buildDropdownFilter('Fill Status', ['All', 'Full', 'Partial', 'Empty'], _fillStatusFilter, (v) { setState(() => _fillStatusFilter = v!); _applyFilters(); }),
+                _buildDropdownFilter('Fill Status', ['All', 'Full', 'Partial', 'Empty'], _fillStatusFilter, (v) { setState(() => _fillStatusFilter = v ?? _fillStatusFilter); _applyFilters(); }),
                 const SizedBox(width: 10),
                 if (_categories.isNotEmpty) ...[
-                  _buildDropdownFilter('Category', ['All', ..._categories], _selectedCategory, (v) { setState(() => _selectedCategory = v!); _applyFilters(); }),
+                  _buildDropdownFilter('Category', ['All', ..._categories], _selectedCategory, (v) { setState(() => _selectedCategory = v ?? _selectedCategory); _applyFilters(); }),
                   const SizedBox(width: 10),
                 ],
                 if (_settings.referenceAsDropdown && _settings.referenceOptions.isNotEmpty) ...[
-                  _buildDropdownFilter('Reference', ['All', ..._settings.referenceOptions], _selectedReference, (v) { setState(() => _selectedReference = v!); _applyFilters(); }),
+                  _buildDropdownFilter('Reference', ['All', ..._settings.referenceOptions], _selectedReference, (v) { setState(() => _selectedReference = v ?? _selectedReference); _applyFilters(); }),
                   const SizedBox(width: 10),
                 ],
-                _buildDropdownFilter('Sort', _sortOptions, _sortBy, (v) { setState(() => _sortBy = v!); _applyFilters(); }),
+                _buildDropdownFilter('Sort', _sortOptions, _sortBy, (v) { setState(() => _sortBy = v ?? _sortBy); _applyFilters(); }),
                 const SizedBox(width: 10),
                 InkWell(
                   onTap: () async {
@@ -453,17 +456,27 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
                       _applyFilters();
                     }
                   },
-                  child: Container(
-                    height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_month, size: 16, color: Colors.grey.shade700),
-                        const SizedBox(width: 6),
-                        Text(_filterDate != null ? '${_filterDate!.day}/${_filterDate!.month}/${_filterDate!.year}' : 'Date', style: const TextStyle(fontSize: 13)),
-                      ],
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text('Date', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+                      ),
+                      Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.calendar_month, size: 16, color: Colors.grey.shade700),
+                            const SizedBox(width: 6),
+                            Text(_filterDate != null ? '${_filterDate!.day}/${_filterDate!.month}/${_filterDate!.year}' : 'Select Date', style: const TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -477,27 +490,18 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
   }
 
   Widget _buildDropdownFilter(String label, List<String> options, String currentValue, ValueChanged<String?> onChanged) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
-        ),
-        Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: currentValue,
-              items: options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
-              onChanged: onChanged,
-              style: const TextStyle(fontSize: 13, color: Colors.black87),
-            ),
-          ),
-        ),
-      ],
+    return ValidatedDropdownMenu(
+      label: label,
+      options: options,
+      initialSelection: currentValue,
+      width: 140,
+      inputDecorationTheme: InputDecorationTheme(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+      ),
+      onSelected: onChanged,
     );
   }
 
@@ -582,7 +586,7 @@ class _QurbaniStatusScreenState extends State<QurbaniStatusScreen> {
             });
           },
         ),
-        title: Text('Token #$tokenNo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text('Token #$tokenNo  •  ${token['category_title'] ?? "Category"}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         subtitle: Text('${token['filled_slots']}/$max Hissah - ${isDone ? "Done" : "Pending"}'),
         children: [
           Container(
@@ -1459,22 +1463,29 @@ class _HistoryTabState extends State<_HistoryTab> {
   }
 
   Widget _buildDropdownChip(String label, String value, List<String> options, ValueChanged<String?> onChanged) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: value != 'All' ? _brand.withOpacity(0.1) : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: value != 'All' ? _brand : Colors.grey.shade300),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
+    return Theme(
+      data: Theme.of(context).copyWith(
+        inputDecorationTheme: InputDecorationTheme(
           isDense: true,
-          icon: Icon(Icons.arrow_drop_down, size: 18, color: value != 'All' ? _brand : Colors.grey.shade600),
-          style: TextStyle(fontSize: 12, color: value != 'All' ? _brand : Colors.grey.shade700),
-          items: options.map((o) => DropdownMenuItem(value: o, child: Text(o == 'All' ? label : o))).toList(),
-          onChanged: onChanged,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: BorderSide(color: value != 'All' ? _brand : Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: BorderSide(color: value != 'All' ? _brand : Colors.grey.shade300),
+          ),
+          filled: true,
+          fillColor: value != 'All' ? _brand.withOpacity(0.1) : Colors.grey.shade100,
         ),
+      ),
+      child: ValidatedDropdownMenu(
+        label: label,
+        showLabelAbove: false,
+        options: options,
+        initialSelection: value,
+        onSelected: onChanged,
       ),
     );
   }

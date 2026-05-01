@@ -89,9 +89,10 @@ def assign_names_to_tokens(
                 "owner_name": name,
             })
         else:
-            # Step 3: No partial token — create a NEW one globally
+            # Step 3: No partial token — create a NEW one per category
             last_token_no = (
                 db.query(func.max(Token.token_no))
+                .filter(Token.category_title == category_title)
                 .scalar()
             ) or 0
 
@@ -452,7 +453,11 @@ def bulk_move_entries(req: BulkMoveRequest, db: Session = Depends(get_db)):
                 cat = db.query(Category).filter(Category.title == cat_title).first()
                 max_s = cat.hissah_per_token if cat else 7
                 
-                last_no = db.query(func.max(Token.token_no)).scalar() or 0
+                last_no = (
+                    db.query(func.max(Token.token_no))
+                    .filter(Token.category_title == cat_title)
+                    .scalar()
+                ) or 0
                 target_token = Token(
                     token_no=last_no + 1,
                     category_title=cat_title,

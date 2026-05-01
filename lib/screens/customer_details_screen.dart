@@ -5,6 +5,7 @@ import '../models/form_settings.dart';
 import '../services/database_service.dart';
 import '../services/receipt_generator.dart';
 import '../widgets/success_dialog.dart';
+import '../widgets/validated_dropdown.dart';
 
 class CustomerDetailsScreen extends StatefulWidget {
   final String qurbaniSize;
@@ -232,12 +233,14 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     if (field.fieldType == 'dropdown') {
       return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
-        child: DropdownButtonFormField<String>(
-          value: _customDropdownValues[field.id],
-          decoration: InputDecoration(labelText: '${field.label}${field.isRequired ? " *" : ""}'),
-          items: field.dropdownOptions.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
-          onChanged: (val) => setState(() => _customDropdownValues[field.id] = val),
-          validator: field.isRequired ? (val) => val == null || val.isEmpty ? '${field.label} is required' : null : null,
+        child: ValidatedDropdownMenu(
+          initialSelection: _customDropdownValues[field.id],
+          label: '${field.label}${field.isRequired ? " *" : ""}',
+          showLabelAbove: false,
+          expandedInsets: EdgeInsets.zero,
+          menuHeight: 200,
+          options: field.dropdownOptions,
+          onSelected: (val) => setState(() => _customDropdownValues[field.id] = val),
         ),
       );
     }
@@ -390,20 +393,14 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 if (_settings.referenceAsDropdown && _settings.referenceOptions.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
-                    child: DropdownButtonFormField<String>(
-                      value: _referenceController.text.isNotEmpty && _settings.referenceOptions.contains(_referenceController.text) ? _referenceController.text : null,
-                      decoration: const InputDecoration(labelText: 'Reference'),
-                      isExpanded: true,
-                      items: _settings.referenceOptions.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
-                      selectedItemBuilder: (context) {
-                        return _settings.referenceOptions.map((opt) {
-                          return Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(opt, overflow: TextOverflow.ellipsis, maxLines: 1),
-                          );
-                        }).toList();
-                      },
-                      onChanged: (val) => _referenceController.text = val ?? '',
+                    child: ValidatedDropdownMenu(
+                      initialSelection: _referenceController.text.isNotEmpty && _settings.referenceOptions.contains(_referenceController.text) ? _referenceController.text : null,
+                      label: 'Reference',
+                      showLabelAbove: false,
+                      expandedInsets: EdgeInsets.zero,
+                      menuHeight: 200,
+                      options: _settings.referenceOptions,
+                      onSelected: (val) => _referenceController.text = val ?? '',
                     ),
                   )
                 else

@@ -5,6 +5,7 @@ import '../services/platform_helper.dart';
 import '../models/qurbani_category.dart';
 import '../models/form_settings.dart';
 import '../services/database_service.dart';
+import '../widgets/validated_dropdown.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -18,7 +19,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
   List<QurbaniCategory> _categories = [];
   FormSettings _settings = FormSettings();
+  FormSettings _originalSettings = FormSettings(); // Snapshot to detect changes
   bool _isLoading = true;
+  bool _hasUnsavedChanges = false;
 
   // Controllers for Receipt Settings
   final _orgCtrl = TextEditingController();
@@ -36,7 +39,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
   @override
   void dispose() {
-    DatabaseService.saveFormSettings(_settings); // Auto-save on exit
     _orgCtrl.dispose();
     _prefixCtrl.dispose();
     _startNumCtrl.dispose();
@@ -58,6 +60,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     setState(() {
       _categories = cats;
       _settings = settings;
+      _originalSettings = FormSettings.fromJson(settings.toJson()); // Deep copy snapshot
+      _hasUnsavedChanges = false;
       _isLoading = false;
       _orgCtrl.text = _settings.organizationName;
       _prefixCtrl.text = _settings.receiptPrefix;
@@ -71,12 +75,63 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     _loadAll();
   }
 
+  void _markDirty() {
+    if (!_hasUnsavedChanges) setState(() => _hasUnsavedChanges = true);
+  }
+
   Future<void> _saveSettings() async {
     await DatabaseService.saveFormSettings(_settings);
-    setState(() {});
+    _originalSettings = FormSettings.fromJson(_settings.toJson()); // Update snapshot
+    setState(() => _hasUnsavedChanges = false);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Settings saved!'), duration: Duration(seconds: 1)),
     );
+  }
+
+  /// Show unsaved changes dialog. Returns true if user wants to leave.
+  Future<bool> _confirmDiscard() async {
+    if (!_hasUnsavedChanges) return true;
+
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 40),
+        title: const Text('Unsaved Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('You have unsaved changes. What would you like to do?'),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, 'discard'),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.red),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('Discard', style: TextStyle(color: Colors.red)),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, 'save'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D5C46),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('Save & Exit'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'save') {
+      await _saveSettings();
+      return true;
+    } else if (result == 'discard') {
+      // Revert to original
+      _settings = FormSettings.fromJson(_originalSettings.toJson());
+      return true;
+    }
+    return false; // Dialog dismissed
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -233,10 +288,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 children: [
                   const Text('Standard Fields Visibility', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
-                  SwitchListTile(title: const Text('Representative Name'), value: _settings.showRepresentativeName, onChanged: (v) => setState(() => _settings.showRepresentativeName = v)),
-                  SwitchListTile(title: const Text('Address'), value: _settings.showAddress, onChanged: (v) => setState(() => _settings.showAddress = v)),
-                  SwitchListTile(title: const Text('Mobile Number'), value: _settings.showMobileNumber, onChanged: (v) => setState(() => _settings.showMobileNumber = v)),
-                  SwitchListTile(title: const Text('Reference'), value: _settings.showReference, onChanged: (v) => setState(() => _settings.showReference = v)),
+                  SwitchListTile(title: const Text('Representative Name'), value: _settings.showRepresentativeName, onChanged: (v) { setState(() => _settings.showRepresentativeName = v); _markDirty(); }),
+                  SwitchListTile(title: const Text('Address'), value: _settings.showAddress, onChanged: (v) { setState(() => _settings.showAddress = v); _markDirty(); }),
+                  SwitchListTile(title: const Text('Mobile Number'), value: _settings.showMobileNumber, onChanged: (v) { setState(() => _settings.showMobileNumber = v); _markDirty(); }),
+                  SwitchListTile(title: const Text('Reference'), value: _settings.showReference, onChanged: (v) { setState(() => _settings.showReference = v); _markDirty(); }),
                 ],
               ),
             ),
@@ -283,7 +338,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           const SizedBox(width: 8),
                           IconButton(
                             icon: const Icon(Icons.delete, size: 18, color: Colors.red), 
-                            onPressed: () { setState(() => _settings.customFields.removeAt(i)); }, 
+                            onPressed: () { setState(() => _settings.customFields.removeAt(i)); _markDirty(); }, 
                             padding: EdgeInsets.zero, 
                             constraints: const BoxConstraints()
                           ),
@@ -333,16 +388,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     validator: (val) => val == null || val.trim().isEmpty ? 'Field label is required' : null,
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedType,
-                    decoration: const InputDecoration(labelText: 'Field Type'),
-                    items: const [
-                      DropdownMenuItem(value: 'text', child: Text('Text')),
-                      DropdownMenuItem(value: 'number', child: Text('Number')),
-                      DropdownMenuItem(value: 'phone', child: Text('Phone')),
-                      DropdownMenuItem(value: 'dropdown', child: Text('Dropdown')),
-                    ],
-                    onChanged: (val) => setSheetState(() => selectedType = val!),
+                  ValidatedDropdownMenu(
+                    initialSelection: selectedType,
+                    label: 'Field Type',
+                    showLabelAbove: false,
+                    expandedInsets: EdgeInsets.zero,
+                    menuHeight: 200,
+                    options: const ['text', 'number', 'phone', 'dropdown'],
+                    onSelected: (val) => setSheetState(() => selectedType = val ?? 'text'),
                   ),
                   if (selectedType == 'dropdown') ...[
                     const SizedBox(height: 12),
@@ -377,6 +430,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           _settings.customFields.add(field);
                         }
                       });
+                      _markDirty();
                       Navigator.pop(ctx);
                     },
                     child: const Text('Save Field'),
@@ -438,7 +492,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           const SizedBox(width: 8),
                           IconButton(
                             icon: const Icon(Icons.delete, size: 18, color: Colors.red), 
-                            onPressed: () { setState(() => _settings.purposes.removeAt(i)); }, 
+                            onPressed: () { setState(() => _settings.purposes.removeAt(i)); _markDirty(); }, 
                             padding: EdgeInsets.zero, 
                             constraints: const BoxConstraints()
                           ),
@@ -499,6 +553,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         _settings.purposes.add(ctrl.text.trim());
                       }
                     });
+                    _markDirty();
                     Navigator.pop(ctx);
                   },
                   child: const Text('Save'),
@@ -535,6 +590,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     decoration: const InputDecoration(labelText: 'Organization Name', hintText: 'e.g. Madrasa Talimul Quran'),
                     onChanged: (v) {
                       _settings.organizationName = v;
+                      _markDirty();
                       setState((){});
                     },
                   ),
@@ -544,6 +600,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     decoration: const InputDecoration(labelText: 'Receipt Prefix Text', hintText: 'e.g. RCPT-'),
                     onChanged: (v) {
                       _settings.receiptPrefix = v;
+                      _markDirty();
                       setState((){});
                     },
                   ),
@@ -554,6 +611,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     decoration: const InputDecoration(labelText: 'Starting Receipt Number', hintText: 'e.g. 101'),
                     onChanged: (v) {
                       _settings.startingReceiptNumber = int.tryParse(v) ?? 1;
+                      _markDirty();
                       setState((){});
                     },
                   ),
@@ -563,6 +621,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     decoration: const InputDecoration(labelText: 'Currency Symbol', hintText: 'e.g. ₹, PKR, \$'),
                     onChanged: (v) {
                       _settings.currencySymbol = v;
+                      _markDirty();
                       setState((){});
                     },
                   ),
@@ -806,7 +865,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     title: const Text('Use Dropdown Instead of Text'),
                     subtitle: const Text('If enabled, reference becomes a dropdown'),
                     value: _settings.referenceAsDropdown,
-                    onChanged: (v) => setState(() => _settings.referenceAsDropdown = v),
+                    onChanged: (v) { setState(() => _settings.referenceAsDropdown = v); _markDirty(); },
                   ),
                   if (_settings.referenceAsDropdown) ...[
                     const SizedBox(height: 12),
@@ -815,6 +874,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       decoration: const InputDecoration(labelText: 'Dropdown Options (comma separated)', hintText: 'Friend, Social Media, Masjid, Other'),
                       onChanged: (v) {
                         _settings.referenceOptions = v.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                        _markDirty();
                       },
                     ),
                   ],
@@ -871,7 +931,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   // ═══════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final canLeave = await _confirmDiscard();
+        if (canLeave && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Admin Panel'),
         backgroundColor: Colors.blueGrey.shade800,
@@ -907,6 +974,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               ),
       ),
       floatingActionButton: _buildFab(),
+    ),
     );
   }
 }
