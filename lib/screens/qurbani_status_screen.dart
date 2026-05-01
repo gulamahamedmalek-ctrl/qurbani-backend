@@ -1464,29 +1464,29 @@ class _HistoryTabState extends State<_HistoryTab> {
   }
 
   Widget _buildDropdownChip(String label, String value, List<String> options, ValueChanged<String?> onChanged) {
-    return Theme(
-      data: Theme.of(context).copyWith(
-        inputDecorationTheme: InputDecorationTheme(
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide(color: value != 'All' ? _brand : Colors.grey.shade300),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide(color: value != 'All' ? _brand : Colors.grey.shade300),
-          ),
-          filled: true,
-          fillColor: value != 'All' ? _brand.withOpacity(0.1) : Colors.grey.shade100,
-        ),
+    final isActive = value != 'All';
+    return Container(
+      height: 32, // Match ActionChip height
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: isActive ? _brand.withOpacity(0.1) : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isActive ? _brand : Colors.grey.shade300),
       ),
-      child: ValidatedDropdownMenu(
-        label: label,
-        showLabelAbove: false,
-        options: options,
-        initialSelection: value,
-        onSelected: onChanged,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          icon: Icon(Icons.arrow_drop_down, size: 18, color: isActive ? _brand : Colors.grey.shade700),
+          isDense: true,
+          style: TextStyle(fontSize: 12, color: isActive ? _brand : Colors.grey.shade800, fontWeight: isActive ? FontWeight.w600 : FontWeight.normal),
+          items: ['All', ...options.where((o) => o != 'All')].toSet().map((String opt) {
+            return DropdownMenuItem<String>(
+              value: opt,
+              child: Text(opt == 'All' ? label : opt),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
       ),
     );
   }
