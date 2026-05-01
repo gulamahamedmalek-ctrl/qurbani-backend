@@ -56,6 +56,7 @@ class FormSettings {
   int startingReceiptNumber;
   String currencySymbol;
   String logoBase64; // Base64 encoded logo image for receipt
+  String rulesAttachmentBase64; // Base64 image to attach as second page of receipt
 
   FormSettings({
     List<String>? purposes,
@@ -72,6 +73,7 @@ class FormSettings {
     this.startingReceiptNumber = 1,
     this.currencySymbol = '₹',
     this.logoBase64 = '',
+    this.rulesAttachmentBase64 = '',
   })  : purposes = purposes ?? ['Qurbani', 'Aqiqah'],
         referenceOptions = referenceOptions ?? ['Friend', 'Social Media', 'Masjid Announcement', 'Other'],
         customFields = customFields ?? [];
@@ -91,6 +93,7 @@ class FormSettings {
         'startingReceiptNumber': startingReceiptNumber,
         'currencySymbol': currencySymbol,
         'logoBase64': logoBase64,
+        'rulesAttachmentBase64': rulesAttachmentBase64,
       };
 
   factory FormSettings.fromJson(Map<String, dynamic> json) => FormSettings(
@@ -111,5 +114,6 @@ class FormSettings {
         startingReceiptNumber: json['startingReceiptNumber'] ?? 1,
         currencySymbol: json['currencySymbol'] ?? '₹',
         logoBase64: json['logoBase64'] ?? '',
+        rulesAttachmentBase64: json['rulesAttachmentBase64'] ?? '',
       );
 }

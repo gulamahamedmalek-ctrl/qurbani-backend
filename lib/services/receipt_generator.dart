@@ -61,11 +61,13 @@ class ReceiptGenerator {
     required List<Map<String, dynamic>> tokenAssignments,
     int maxSlots = 7,
     String logoBase64 = '',
+    String rulesAttachmentBase64 = '',
   }) async {
     await _loadFonts();
 
     // Decode logo
     final logoImage = _decodeLogo(logoBase64);
+    final rulesImage = _decodeLogo(rulesAttachmentBase64);
 
     // Safe currency (avoid Unicode issues with built-in fonts)
     final cur = currencySymbol == '\u20b9' ? 'Rs.' : currencySymbol;
@@ -245,6 +247,21 @@ class ReceiptGenerator {
         },
       ),
     );
+
+    // ── PAGE 2: Rules Attachment (If exists) ──
+    if (rulesImage != null) {
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.zero,
+          build: (pw.Context ctx) {
+            return pw.Center(
+              child: pw.Image(rulesImage, fit: pw.BoxFit.contain),
+            );
+          },
+        ),
+      );
+    }
 
     // Download/Save PDF
     final bytes = await pdf.save();

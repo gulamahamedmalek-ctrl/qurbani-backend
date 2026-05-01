@@ -73,6 +73,7 @@ class _ValidatedDropdownMenuState extends State<ValidatedDropdownMenu> {
     final dropdown = DropdownMenu<String>(
       controller: _controller,
       initialSelection: widget.initialSelection,
+      label: widget.showLabelAbove ? null : Text(widget.label),
       width: widget.width,
       expandedInsets: widget.expandedInsets,
       menuHeight: widget.menuHeight,

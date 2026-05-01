@@ -1053,6 +1053,7 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
       currencySymbol: widget.settings.currencySymbol,
       organizationName: widget.settings.organizationName,
       logoBase64: widget.settings.logoBase64,
+      rulesAttachmentBase64: widget.settings.rulesAttachmentBase64,
       tokenAssignments: _hissahEntries,
     );
   }

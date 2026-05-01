@@ -674,9 +674,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   ),
                   const SizedBox(height: 16),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                  Center(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
                       ElevatedButton.icon(
                         onPressed: _pickLogo,
                         icon: const Icon(Icons.upload, size: 16),
@@ -689,7 +692,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         ),
                       ),
                       if (_settings.logoBase64.isNotEmpty) ...[
-                        const SizedBox(width: 12),
                         OutlinedButton.icon(
                           onPressed: () {
                             setState(() => _settings.logoBase64 = '');
@@ -706,8 +708,95 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       ],
                     ],
                   ),
+                ),
                 ],
               ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+
+          // --- Rules Attachment Upload Section ---
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Receipt Attachment / Rules (Printed on next page)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text('Upload an image containing rules or instructions. It will be automatically appended as a second page to every receipt.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  const SizedBox(height: 20),
+                  
+                  Center(
+                    child: Container(
+                      width: 200,
+                      height: 150,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: _settings.rulesAttachmentBase64.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.memory(
+                                base64Decode(_settings.rulesAttachmentBase64.contains(',') ? _settings.rulesAttachmentBase64.split(',').last : _settings.rulesAttachmentBase64),
+                                fit: BoxFit.contain,
+                              ),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.description, size: 40, color: Colors.grey.shade400),
+                                const SizedBox(height: 4),
+                                Text('No Attachment', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                              ],
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Center(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _pickRulesAttachment,
+                          icon: const Icon(Icons.upload, size: 16),
+                          label: const Text('Upload Rules Image', style: TextStyle(fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueGrey.shade700,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                        if (_settings.rulesAttachmentBase64.isNotEmpty) ...[
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() => _settings.rulesAttachmentBase64 = '');
+                              _saveSettings();
+                            },
+                            icon: const Icon(Icons.delete, size: 16, color: Colors.red),
+                            label: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 13)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
             ),
           ),
 
@@ -835,6 +924,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       
       setState(() {
         _settings.logoBase64 = cleanBase64;
+      });
+      _saveSettings();
+    }
+  }
+
+  /// Pick an image for rules attachment and convert to base64.
+  Future<void> _pickRulesAttachment() async {
+    final base64Image = await PlatformHelper.instance.pickImageAsBase64();
+    if (base64Image != null) {
+      String cleanBase64 = base64Image;
+      if (cleanBase64.contains(',')) {
+        cleanBase64 = cleanBase64.split(',').last;
+      }
+      
+      setState(() {
+        _settings.rulesAttachmentBase64 = cleanBase64;
       });
       _saveSettings();
     }

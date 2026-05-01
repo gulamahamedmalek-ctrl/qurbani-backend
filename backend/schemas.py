@@ -66,6 +66,7 @@ class FormSettingsSchema(BaseModel):
     startingReceiptNumber: int = 1
     currencySymbol: str = "₹"
     logoBase64: str = ""
+    rulesAttachmentBase64: str = ""
 
 
 # ═══════════════════════════════════════════════

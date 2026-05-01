@@ -395,7 +395,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     padding: const EdgeInsets.only(bottom: 16.0),
                     child: ValidatedDropdownMenu(
                       initialSelection: _referenceController.text.isNotEmpty && _settings.referenceOptions.contains(_referenceController.text) ? _referenceController.text : null,
-                      label: 'Reference',
+                      label: 'Reference *',
                       showLabelAbove: false,
                       expandedInsets: EdgeInsets.zero,
                       menuHeight: 200,
@@ -404,7 +404,9 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     ),
                   )
                 else
-                  _buildTextField('Reference (How did you hear about us?)', _referenceController),
+                  _buildTextField('Reference (How did you hear about us?) *', _referenceController,
+                    validator: (val) => _validateRequired(val, 'Reference'),
+                  ),
               ],
 
               // Dynamic Custom Fields
@@ -478,6 +480,18 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
 
                   // STEP 2: Prevent double-submit
                   setState(() => _isSubmitting = true);
+
+                  // STEP 3: Validate Dropdown Fields (which are not caught by FormKey)
+                  if (_settings.showReference && _referenceController.text.trim().isEmpty) {
+                    setState(() => _isSubmitting = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please select or enter a Reference.'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    return;
+                  }
 
                   // Collect owner names
                   final ownerNames = _ownerNameControllers
@@ -575,6 +589,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                           tokenAssignments: tokenAssignments,
                           maxSlots: widget.hissahPerToken,
                           logoBase64: _settings.logoBase64,
+                          rulesAttachmentBase64: _settings.rulesAttachmentBase64,
                         );
                       },
                     );
