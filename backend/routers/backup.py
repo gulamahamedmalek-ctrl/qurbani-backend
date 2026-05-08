@@ -49,7 +49,7 @@ class RestorePayload(BaseModel):
 def backup_status():
     """Check if Google Drive backup is properly configured."""
     import os
-    configured = bool(os.environ.get("GOOGLE_CREDENTIALS_JSON"))
+    configured = bool(os.environ.get("GOOGLE_REFRESH_TOKEN") and os.environ.get("GOOGLE_CLIENT_ID"))
     return success_response("Backup status", {"configured": configured})
 
 

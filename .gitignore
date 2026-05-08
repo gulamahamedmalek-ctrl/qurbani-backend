@@ -54,3 +54,5 @@ venv/
 # Google Service Account credentials (NEVER commit)
 *.iam.gserviceaccount.com*
 united-coil-*.json
+client_secret_*.json
+get_token.py

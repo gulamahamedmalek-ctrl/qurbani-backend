@@ -13,7 +13,8 @@ import gzip
 import io
 import logging
 from datetime import datetime, timezone
-from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from sqlalchemy.orm import Session
@@ -32,13 +33,28 @@ _cached_folder_id = None
 
 
 def _get_credentials():
-    """Load Google service account credentials from environment variable."""
-    creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
-    if not creds_json:
-        raise RuntimeError("GOOGLE_CREDENTIALS_JSON environment variable not set")
-    
-    info = json.loads(creds_json)
-    return service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+    """Load OAuth2 credentials using refresh token from environment variables."""
+    refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+
+    if not all([refresh_token, client_id, client_secret]):
+        raise RuntimeError(
+            "Google OAuth2 credentials not configured. "
+            "Set GOOGLE_REFRESH_TOKEN, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET env vars."
+        )
+
+    creds = Credentials(
+        token=None,
+        refresh_token=refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=SCOPES,
+    )
+    # Refresh to get a valid access token
+    creds.refresh(Request())
+    return creds
 
 
 def _get_drive_service():

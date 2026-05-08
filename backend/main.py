@@ -41,8 +41,8 @@ def on_startup():
     init_db()
     print("[OK] Database initialized. Tables created.")
 
-    # Start auto-backup scheduler if Google credentials are configured
-    if os.environ.get("GOOGLE_CREDENTIALS_JSON"):
+    # Start auto-backup scheduler if Google OAuth2 credentials are configured
+    if os.environ.get("GOOGLE_REFRESH_TOKEN"):
         try:
             from apscheduler.schedulers.background import BackgroundScheduler
             from backup import run_scheduled_backup
