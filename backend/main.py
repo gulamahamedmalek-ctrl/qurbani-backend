@@ -1,11 +1,16 @@
+import os
+import json
+import logging
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import init_db, get_db
 from routers import categories, settings, bookings, tokens
+from routers import backup as backup_router
 from models import Booking, Token, TokenEntry, FormSettingsRow
-import json
+
+logger = logging.getLogger("main")
 
 app = FastAPI(
     title="Qurbani Hissah API",
@@ -27,13 +32,35 @@ app.include_router(categories.router)
 app.include_router(settings.router)
 app.include_router(bookings.router)
 app.include_router(tokens.router)
+app.include_router(backup_router.router)
 
 
 @app.on_event("startup")
 def on_startup():
-    """Create database tables on first run. Safe to call repeatedly."""
+    """Create database tables on first run and start backup scheduler."""
     init_db()
     print("[OK] Database initialized. Tables created.")
+
+    # Start auto-backup scheduler if Google credentials are configured
+    if os.environ.get("GOOGLE_CREDENTIALS_JSON"):
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from backup import run_scheduled_backup
+
+            scheduler = BackgroundScheduler()
+            scheduler.add_job(
+                run_scheduled_backup,
+                "interval",
+                hours=24,
+                id="auto_backup",
+                replace_existing=True,
+            )
+            scheduler.start()
+            logger.info("✅ Auto-backup scheduler started (every 24 hours)")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not start backup scheduler: {e}")
+    else:
+        logger.info("ℹ️ Google credentials not set — auto-backup disabled")
 
 
 @app.get("/", tags=["Health"])

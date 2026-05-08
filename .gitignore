@@ -50,3 +50,7 @@ __pycache__/
 *.sqlite3
 .venv/
 venv/
+
+# Google Service Account credentials (NEVER commit)
+*.iam.gserviceaccount.com*
+united-coil-*.json
