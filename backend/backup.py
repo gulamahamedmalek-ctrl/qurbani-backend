@@ -24,7 +24,7 @@ logger = logging.getLogger("backup")
 logger.setLevel(logging.INFO)
 
 # ── Google Drive Config ──
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 BACKUP_FOLDER_NAME = "Qurbani Backups"
 
 # Cache the folder ID so we don't look it up every time
@@ -47,29 +47,32 @@ def _get_drive_service():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-def _find_or_create_folder(service):
-    """Find the 'Qurbani Backups' folder shared with the service account, or create one."""
+def _find_backup_folder(service):
+    """Find the 'Qurbani Backups' folder that was shared with the service account."""
     global _cached_folder_id
     if _cached_folder_id:
         return _cached_folder_id
 
-    # Search for existing folder
+    # Search for folder shared with this service account
     query = f"name='{BACKUP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    results = service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
+    results = service.files().list(
+        q=query,
+        spaces="drive",
+        fields="files(id, name)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+    ).execute()
     files = results.get("files", [])
 
-    if files:
-        _cached_folder_id = files[0]["id"]
-        return _cached_folder_id
+    if not files:
+        raise RuntimeError(
+            f"Folder '{BACKUP_FOLDER_NAME}' not found! "
+            f"Please create a folder named '{BACKUP_FOLDER_NAME}' in your Google Drive "
+            f"and share it with the service account email as Editor."
+        )
 
-    # Create the folder if not found
-    metadata = {
-        "name": BACKUP_FOLDER_NAME,
-        "mimeType": "application/vnd.google-apps.folder",
-    }
-    folder = service.files().create(body=metadata, fields="id").execute()
-    _cached_folder_id = folder["id"]
-    logger.info(f"Created backup folder: {_cached_folder_id}")
+    _cached_folder_id = files[0]["id"]
+    logger.info(f"Found backup folder: {_cached_folder_id}")
     return _cached_folder_id
 
 
@@ -194,7 +197,7 @@ def create_backup(db: Session) -> dict:
     filename = f"qurbani_backup_{timestamp}.json.gz"
 
     service = _get_drive_service()
-    folder_id = _find_or_create_folder(service)
+    folder_id = _find_backup_folder(service)
 
     file_metadata = {
         "name": filename,
@@ -217,7 +220,7 @@ def create_backup(db: Session) -> dict:
 def list_backups(limit: int = 20) -> list:
     """List recent backups from Google Drive folder."""
     service = _get_drive_service()
-    folder_id = _find_or_create_folder(service)
+    folder_id = _find_backup_folder(service)
 
     query = f"'{folder_id}' in parents and trashed=false"
     results = service.files().list(
