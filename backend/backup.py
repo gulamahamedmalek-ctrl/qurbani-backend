@@ -64,31 +64,29 @@ def _get_drive_service():
 
 
 def _find_backup_folder(service):
-    """Find the 'Qurbani Backups' folder that was shared with the service account."""
+    """Find or create the 'Qurbani Backups' folder in user's Google Drive."""
     global _cached_folder_id
     if _cached_folder_id:
         return _cached_folder_id
 
-    # Search for folder shared with this service account
+    # Search for existing folder in user's Drive
     query = f"name='{BACKUP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    results = service.files().list(
-        q=query,
-        spaces="drive",
-        fields="files(id, name)",
-        supportsAllDrives=True,
-        includeItemsFromAllDrives=True,
-    ).execute()
+    results = service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
     files = results.get("files", [])
 
-    if not files:
-        raise RuntimeError(
-            f"Folder '{BACKUP_FOLDER_NAME}' not found! "
-            f"Please create a folder named '{BACKUP_FOLDER_NAME}' in your Google Drive "
-            f"and share it with the service account email as Editor."
-        )
+    if files:
+        _cached_folder_id = files[0]["id"]
+        logger.info(f"Found backup folder: {_cached_folder_id}")
+        return _cached_folder_id
 
-    _cached_folder_id = files[0]["id"]
-    logger.info(f"Found backup folder: {_cached_folder_id}")
+    # Create the folder automatically (user owns it via OAuth2)
+    metadata = {
+        "name": BACKUP_FOLDER_NAME,
+        "mimeType": "application/vnd.google-apps.folder",
+    }
+    folder = service.files().create(body=metadata, fields="id").execute()
+    _cached_folder_id = folder["id"]
+    logger.info(f"Created backup folder: {_cached_folder_id}")
     return _cached_folder_id
 
 
