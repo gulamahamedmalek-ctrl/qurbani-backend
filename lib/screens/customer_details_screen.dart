@@ -534,6 +534,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${result['message']}'), backgroundColor: Colors.red));
                     }
                   } else {
+                    try {
                     final result = await DatabaseService.createBooking(
                       categoryTitle: widget.qurbaniSize,
                       amountPerHissah: widget.portionAmount,
@@ -601,6 +602,17 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                       ),
                     );
                   }
+                    } catch (e) {
+                      if (!mounted) return;
+                      setState(() => _isSubmitting = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Booking failed: $e. Please try again.'),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    }
                   }
                 },
                 child: _isSubmitting

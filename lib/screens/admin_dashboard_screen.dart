@@ -32,7 +32,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _tabController.addListener(() => setState(() {})); // Rebuild UI on every tab switch
     _loadAll();
   }
@@ -946,7 +946,250 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   }
 
   // ═══════════════════════════════════════════════════════════
-  // TAB 5 — Settings (PIN + Reference Mode)
+  // TAB 5 — Backup (Google Drive)
+  // ═══════════════════════════════════════════════════════════
+  bool _backupLoading = false;
+  List<Map<String, dynamic>> _backupList = [];
+  bool _backupListLoaded = false;
+
+  Widget _buildBackupTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [Colors.blueGrey.shade800, Colors.blueGrey.shade600]),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.cloud_upload, color: Colors.white, size: 28),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text('Google Drive Backup', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your data is automatically backed up to Google Drive every 24 hours. You can also create manual backups or restore from a previous backup.',
+                  style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                // Backup Now Button
+                Center(
+                  child: ElevatedButton.icon(
+                    onPressed: _backupLoading ? null : _triggerBackup,
+                    icon: _backupLoading
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.backup),
+                    label: Text(_backupLoading ? 'Creating Backup...' : 'Backup Now'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.blueGrey.shade800,
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Backup History
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Backup History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              TextButton.icon(
+                onPressed: _loadBackupList,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Refresh'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          if (!_backupListLoaded)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    Icon(Icons.cloud_queue, size: 48, color: Colors.grey.shade400),
+                    const SizedBox(height: 12),
+                    Text('Tap Refresh to load backup history', style: TextStyle(color: Colors.grey.shade500)),
+                  ],
+                ),
+              ),
+            )
+          else if (_backupList.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    Icon(Icons.cloud_off, size: 48, color: Colors.grey.shade400),
+                    const SizedBox(height: 12),
+                    Text('No backups found', style: TextStyle(color: Colors.grey.shade500)),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._backupList.map((backup) {
+              final filename = backup['filename'] ?? '';
+              final sizeKb = backup['size_kb'] ?? 0;
+              final createdAt = backup['created_at'] ?? '';
+              final fileId = backup['gdrive_file_id'] ?? '';
+
+              // Parse and format the date
+              String displayDate = createdAt;
+              try {
+                final dt = DateTime.parse(createdAt).toLocal();
+                displayDate = '${dt.day}/${dt.month}/${dt.year}  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+              } catch (_) {}
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.cloud_done, color: Colors.green, size: 24),
+                  ),
+                  title: Text(displayDate, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: Text('${sizeKb} KB', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.restore, color: Colors.orange),
+                    tooltip: 'Restore this backup',
+                    onPressed: () => _confirmRestore(fileId, displayDate),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _triggerBackup() async {
+    setState(() => _backupLoading = true);
+    try {
+      final result = await DatabaseService.createBackup(
+        'taalimulquran@madrasa.com',
+        'ahemfariza@0011',
+      );
+      if (mounted) {
+        if (result['success'] == true) {
+          final data = result['data'] ?? {};
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('✅ Backup created! (${data['size_kb'] ?? 0} KB)'), backgroundColor: Colors.green),
+          );
+          _loadBackupList();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('❌ ${result['message']}'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Backup failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+    if (mounted) setState(() => _backupLoading = false);
+  }
+
+  Future<void> _loadBackupList() async {
+    try {
+      final result = await DatabaseService.listBackups();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _backupList = List<Map<String, dynamic>>.from(result['data']?['backups'] ?? []);
+          _backupListLoaded = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load backups: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _confirmRestore(String fileId, String dateStr) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('⚠️ Restore Backup?'),
+        content: Text(
+          'This will REPLACE all current bookings, tokens, and categories with the backup from:\n\n$dateStr\n\nThis action cannot be undone!',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _performRestore(fileId);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Restore', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performRestore(String fileId) async {
+    setState(() => _backupLoading = true);
+    try {
+      final result = await DatabaseService.restoreBackup(
+        'taalimulquran@madrasa.com',
+        'ahemfariza@0011',
+        fileId,
+      );
+      if (mounted) {
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Backup restored successfully!'), backgroundColor: Colors.green),
+          );
+          _loadAll(); // Reload all data
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('❌ ${result['message']}'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Restore failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+    if (mounted) setState(() => _backupLoading = false);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // TAB 6 — Settings (PIN + Reference Mode)
   // ═══════════════════════════════════════════════════════════
   Widget _buildSettingsTab() {
     final refOptsCtrl = TextEditingController(text: _settings.referenceOptions.join(', '));
@@ -1060,6 +1303,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             Tab(icon: Icon(Icons.build, size: 20), text: 'Form'),
             Tab(icon: Icon(Icons.flag, size: 20), text: 'Purposes'),
             Tab(icon: Icon(Icons.receipt_long, size: 20), text: 'Receipt & Branding'),
+            Tab(icon: Icon(Icons.backup, size: 20), text: 'Backup'),
             Tab(icon: Icon(Icons.settings, size: 20), text: 'Settings'),
           ],
         ),
@@ -1074,6 +1318,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   _buildFormBuilderTab(),
                   _buildPurposesTab(),
                   _buildReceiptTab(),
+                  _buildBackupTab(),
                   _buildSettingsTab(),
                 ],
               ),

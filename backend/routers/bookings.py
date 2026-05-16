@@ -18,9 +18,10 @@ router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
 def _generate_receipt_no(db: Session) -> str:
     """
     Auto-generate the next receipt number using the admin's configured prefix.
-    Uses COUNT of existing bookings (not max ID) so numbers reset correctly after data wipe.
+    Uses MAX receipt number from existing bookings (not COUNT) to avoid
+    collisions after data restores, partial deletes, or backup imports.
     """
-    # Get receipt prefix from settings
+    # Get receipt prefix and starting number from settings
     prefix = "RCPT-"
     start_num = 1
     settings_row = db.query(FormSettingsRow).filter(FormSettingsRow.id == 1).first()
@@ -32,9 +33,19 @@ def _generate_receipt_no(db: Session) -> str:
         except (json.JSONDecodeError, KeyError):
             pass
 
-    # Count existing bookings (not max ID — survives data resets)
-    count = db.query(func.count(Booking.id)).scalar() or 0
-    next_number = count + start_num
+    # Find the highest receipt number currently in the database
+    max_num = start_num - 1  # Default: one before start
+    all_bookings = db.query(Booking.receipt_no).all()
+    for (rno,) in all_bookings:
+        if rno and rno.startswith(prefix):
+            try:
+                num = int(rno[len(prefix):])
+                if num > max_num:
+                    max_num = num
+            except (ValueError, IndexError):
+                pass
+
+    next_number = max_num + 1
     return f"{prefix}{next_number}"
 
 
@@ -63,49 +74,71 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     
     CONCURRENCY SAFE: The booking_lock ensures that even if two cashiers
     click 'Book' at the exact same millisecond, they queue in order.
+    
+    COLLISION SAFE: If a receipt number already exists (e.g. after restore),
+    auto-retries with the next available number (up to 5 attempts).
     """
     from database import booking_lock
     
     with booking_lock:
         try:
-            receipt_no = _generate_receipt_no(db)
+            # Try up to 5 times in case of receipt number collision
+            max_retries = 5
+            for attempt in range(max_retries):
+                receipt_no = _generate_receipt_no(db)
 
-            booking = Booking(
-                receipt_no=receipt_no,
-                category_title=payload.category_title,
-                amount_per_hissah=payload.amount_per_hissah,
-                purpose=payload.purpose,
-                representative_name=payload.representative_name,
-                owner_names=json.dumps(payload.owner_names),
-                hissah_count=payload.hissah_count,
-                total_amount=payload.total_amount,
-                address=payload.address,
-                mobile=payload.mobile,
-                reference=payload.reference,
-                custom_fields_data=json.dumps(payload.custom_fields_data),
-            )
-            db.add(booking)
-            db.flush() # Get booking.id
+                # Check if this receipt number already exists
+                existing = db.query(Booking).filter(Booking.receipt_no == receipt_no).first()
+                if existing:
+                    # This shouldn't happen with MAX-based logic, but just in case
+                    db.rollback()
+                    continue
 
-            # AUTO-ASSIGN NAMES TO TOKENS
-            from routers.tokens import assign_names_to_tokens
-            token_assignments = assign_names_to_tokens(
-                db=db,
-                category_title=payload.category_title,
-                owner_names=payload.owner_names,
-                booking_id=booking.id,
-                purpose=payload.purpose,
-                separate_token=payload.separate_token,
-            )
+                booking = Booking(
+                    receipt_no=receipt_no,
+                    category_title=payload.category_title,
+                    amount_per_hissah=payload.amount_per_hissah,
+                    purpose=payload.purpose,
+                    representative_name=payload.representative_name,
+                    owner_names=json.dumps(payload.owner_names),
+                    hissah_count=payload.hissah_count,
+                    total_amount=payload.total_amount,
+                    address=payload.address,
+                    mobile=payload.mobile,
+                    reference=payload.reference,
+                    custom_fields_data=json.dumps(payload.custom_fields_data),
+                )
+                db.add(booking)
 
-            # ONE SINGLE COMMIT for everything (Booking + Token Entries)
-            safe_commit(db, "Failed to complete booking transaction")
-            db.refresh(booking)
+                try:
+                    db.flush()  # Get booking.id — will fail if receipt_no is duplicate
+                except Exception:
+                    db.rollback()
+                    continue  # Retry with the next number
 
-            data = BookingResponse.model_validate(booking).model_dump()
-            data["token_assignments"] = token_assignments
-            return success_response("Booking created", data)
+                # AUTO-ASSIGN NAMES TO TOKENS
+                from routers.tokens import assign_names_to_tokens
+                token_assignments = assign_names_to_tokens(
+                    db=db,
+                    category_title=payload.category_title,
+                    owner_names=payload.owner_names,
+                    booking_id=booking.id,
+                    purpose=payload.purpose,
+                    separate_token=payload.separate_token,
+                )
+
+                # ONE SINGLE COMMIT for everything (Booking + Token Entries)
+                safe_commit(db, "Failed to complete booking transaction")
+                db.refresh(booking)
+
+                data = BookingResponse.model_validate(booking).model_dump()
+                data["token_assignments"] = token_assignments
+                return success_response("Booking created", data)
+
+            # If all retries failed
+            return error_response("Failed to create booking: Could not generate a unique receipt number after multiple attempts")
         except Exception as e:
+            db.rollback()
             return error_response(f"Failed to create booking: {str(e)}")
 
 

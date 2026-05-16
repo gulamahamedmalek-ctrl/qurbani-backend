@@ -425,4 +425,40 @@ class DatabaseService {
       return {'success': false, 'message': 'Reset failed: $e'};
     }
   }
+
+  // ═══════════════════════════════════════════════════════
+  // BACKUP
+  // ═══════════════════════════════════════════════════════
+
+  static Future<Map<String, dynamic>> backupStatus() async {
+    try {
+      return await _get('/backup/status');
+    } catch (e) {
+      return {'success': false, 'message': 'Failed: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> createBackup(String email, String password) async {
+    try {
+      return await _post('/backup/create', {'email': email, 'password': password});
+    } catch (e) {
+      return {'success': false, 'message': 'Backup failed: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> listBackups() async {
+    try {
+      return await _get('/backup/list');
+    } catch (e) {
+      return {'success': false, 'message': 'Failed: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> restoreBackup(String email, String password, String gdriveFileId) async {
+    try {
+      return await _post('/backup/restore', {'email': email, 'password': password, 'gdrive_file_id': gdriveFileId});
+    } catch (e) {
+      return {'success': false, 'message': 'Restore failed: $e'};
+    }
+  }
 }

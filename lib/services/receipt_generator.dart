@@ -361,16 +361,21 @@ class ReceiptGenerator {
   }
 
   static pw.Widget _checkBox(String label, bool checked) {
+    final navy = PdfColor.fromHex('#1B2A4A');
     return pw.Row(mainAxisSize: pw.MainAxisSize.min, children: [
       pw.Container(
         width: 12, height: 12,
-        decoration: pw.BoxDecoration(border: pw.Border.all(width: 1), borderRadius: pw.BorderRadius.circular(2)),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(width: 1, color: navy),
+          borderRadius: pw.BorderRadius.circular(2),
+          color: checked ? navy : PdfColors.white,
+        ),
         child: checked
-            ? pw.Center(child: pw.Text('X', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)))
+            ? pw.Center(child: pw.Text('✓', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white)))
             : pw.SizedBox(),
       ),
       pw.SizedBox(width: 4),
-      pw.Text(label, style: const pw.TextStyle(fontSize: 9)),
+      pw.Text(label, style: pw.TextStyle(fontSize: 9, fontWeight: checked ? pw.FontWeight.bold : pw.FontWeight.normal)),
     ]);
   }
 
